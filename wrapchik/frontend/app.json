@@ -35,12 +35,6 @@
         }
       ],
       [
-        "expo-secure-store",
-        {
-          "configureAndroidBackup": true
-        }
-      ],
-      [
         "expo-notifications",
         {
           "color": "#FF5722"
