@@ -107,22 +107,11 @@ export default function SignupScreen() {
       );
 
     if (!result.success) {
-      Alert.alert(
-        'Signup Failed',
-        result.message ||
-          'Unable to create account'
-      );
+      setErrors({ form: result.message || 'Unable to create account' });
       return;
     }
 
-    router.push({
-      pathname: '/(auth)/otp',
-      params: {
-        phone:
-          result.phone ||
-          phone,
-      },
-    });
+    router.replace('/(auth)/login');
   };
 
   return (
@@ -189,6 +178,8 @@ export default function SignupScreen() {
         secureTextEntry
         error={errors.confirmPassword}
       />
+
+      {errors.form ? <Text style={{ color: COLORS.danger }}>{errors.form}</Text> : null}
 
       <Button
         title="Create Account"
