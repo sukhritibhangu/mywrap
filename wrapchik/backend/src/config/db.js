@@ -7,8 +7,7 @@ const connectDB = async () => {
     console.log(`[MongoDB] Connected Successfully: ${conn.connection.host}`);
   } catch (error) {
     console.error(`[MongoDB Error] Connection Failed: ${error.message}`);
-    // Non-fatal fallback for development offline environment
-    console.log('[MongoDB] Running in memory / offline mode fallback warning');
+    throw error;
   }
 };
 
