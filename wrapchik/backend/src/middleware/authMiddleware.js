@@ -30,13 +30,6 @@ const protect = async (req, res, next) => {
       });
     }
 
-    if (!user.phoneVerified) {
-      return res.status(403).json({
-        success: false,
-        message: 'Phone verification required',
-      });
-    }
-
     req.user = user;
 
     next();
