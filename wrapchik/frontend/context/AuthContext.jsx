@@ -4,6 +4,7 @@ import React, {
   useEffect,
 } from 'react';
 
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 
@@ -21,10 +22,11 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const saveSession = async (newToken, newUser) => {
-    await SecureStore.setItemAsync(
-      'wrapchik_jwt_token',
-      newToken
-    );
+    if (Platform.OS === 'web') {
+      await AsyncStorage.setItem('wrapchik_jwt_token', newToken);
+    } else {
+      await SecureStore.setItemAsync('wrapchik_jwt_token', newToken);
+    }
 
     await AsyncStorage.setItem(
       'wrapchik_user_data',
@@ -38,9 +40,9 @@ export const AuthProvider = ({ children }) => {
   const loadStoredAuth = async () => {
     try {
       const storedToken =
-        await SecureStore.getItemAsync(
-          'wrapchik_jwt_token'
-        );
+        Platform.OS === 'web'
+          ? await AsyncStorage.getItem('wrapchik_jwt_token')
+          : await SecureStore.getItemAsync('wrapchik_jwt_token');
 
       const storedUser =
         await AsyncStorage.getItem(
@@ -123,52 +125,14 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const verifyOtp = async (
-    phone,
-    code
-  ) => {
-    setIsLoading(true);
-
-    try {
-      const res =
-        await authService.verifyOtp(
-          phone,
-          code
-        );
-
-      if (res.success && res.token) {
-        await saveSession(
-          res.token,
-          res.user
-        );
-
-        return {
-          success: true,
-          user: res.user,
-        };
-      }
-
-      return {
-        success: false,
-        message: res.message,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: error.message,
-      };
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const logout = async () => {
     setUser(null);
     setToken(null);
 
-    await SecureStore.deleteItemAsync(
-      'wrapchik_jwt_token'
-    );
+    if (Platform.OS !== 'web') {
+      await SecureStore.deleteItemAsync('wrapchik_jwt_token');
+    }
+    await AsyncStorage.removeItem('wrapchik_jwt_token');
 
     await AsyncStorage.removeItem(
       'wrapchik_user_data'
@@ -186,7 +150,6 @@ export const AuthProvider = ({ children }) => {
 
         login,
         register,
-        verifyOtp,
         logout,
       }}
     >
