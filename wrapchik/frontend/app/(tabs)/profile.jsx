@@ -79,7 +79,7 @@ export default function ProfileScreen() {
 
         {/* Menu Navigation Group */}
         <View style={styles.menuGroup}>
-          {MENU_OPTIONS.map((item) => {
+          {MENU_OPTIONS.filter(option => option.id !== 'admin' || isAdmin).map((item) => {
             const IconComp = item.icon;
             return (
               <TouchableOpacity
