@@ -17,7 +17,6 @@ export default function RootLayout() {
           <Stack.Screen name="onboarding" />
           <Stack.Screen name="(auth)/login" />
           <Stack.Screen name="(auth)/signup" />
-          <Stack.Screen name="(auth)/phone-verification" />
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="product/[id]" options={{ presentation: 'modal' }} />
           <Stack.Screen name="checkout" />
