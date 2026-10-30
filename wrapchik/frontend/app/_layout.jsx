@@ -25,16 +25,10 @@ export default function RootLayout() {
           <Stack.Screen name="order-tracking/[id]" />
           <Stack.Screen name="favourites" />
           <Stack.Screen name="support" />
-          <Stack.Screen name="admin/dashboard" />
-          <Stack.Screen name="admin/orders" />
-          <Stack.Screen name="admin/products" />
-          <Stack.Screen name="admin/categories" />
-          <Stack.Screen name="admin/tables" />
-          <Stack.Screen name="admin/settings" />
+          <Stack.Screen name="admin" />
           <Stack.Screen name="notifications" />
           <Stack.Screen name="group-order" />
           <Stack.Screen name="report-issue" />
-          <Stack.Screen name="admin/issues" />
         </Stack>
         </CartProvider>
       </SocketProvider>
