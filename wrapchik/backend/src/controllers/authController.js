@@ -1,6 +1,5 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const twilio = require('twilio');
 const User = require('../models/User');
 
 const generateToken = (id) => {
@@ -37,43 +36,6 @@ const isStrongPassword = (password) => {
   return /^(?=.*[A-Za-z])(?=.*\d).{8,}$/.test(password);
 };
 
-const getTwilioClient = () => {
-  if (
-    !process.env.TWILIO_ACCOUNT_SID ||
-    !process.env.TWILIO_AUTH_TOKEN ||
-    !process.env.TWILIO_VERIFY_SERVICE_SID
-  ) {
-    throw new Error('Twilio OTP configuration is missing');
-  }
-
-  return twilio(
-    process.env.TWILIO_ACCOUNT_SID,
-    process.env.TWILIO_AUTH_TOKEN
-  );
-};
-
-const sendPhoneOtp = async (phone) => {
-  const client = getTwilioClient();
-
-  return client.verify.v2
-    .services(process.env.TWILIO_VERIFY_SERVICE_SID)
-    .verifications.create({
-      to: phone,
-      channel: 'sms',
-    });
-};
-
-const verifyPhoneOtp = async (phone, code) => {
-  const client = getTwilioClient();
-
-  return client.verify.v2
-    .services(process.env.TWILIO_VERIFY_SERVICE_SID)
-    .verificationChecks.create({
-      to: phone,
-      code,
-    });
-};
-
 const registerUser = async (req, res, next) => {
   try {
     const { name, email, phone, password } = req.body;
@@ -102,17 +64,6 @@ const registerUser = async (req, res, next) => {
     });
 
     if (existingEmail) {
-      if (!existingEmail.phoneVerified) {
-        await sendPhoneOtp(existingEmail.phone);
-
-        return res.status(200).json({
-          success: true,
-          requiresVerification: true,
-          phone: existingEmail.phone,
-          message: 'OTP sent to your phone',
-        });
-      }
-
       return res.status(400).json({
         success: false,
         message: 'An account with this email already exists',
@@ -141,13 +92,9 @@ const registerUser = async (req, res, next) => {
       phoneVerified: false,
     });
 
-    await sendPhoneOtp(cleanPhone);
-
     res.status(201).json({
       success: true,
-      requiresVerification: true,
-      phone: cleanPhone,
-      message: 'Account created. OTP sent to your phone.',
+      message: 'Account created. Sign in with your email and password.',
     });
   } catch (error) {
     next(error);
@@ -178,15 +125,6 @@ const loginUser = async (req, res, next) => {
       });
     }
 
-    if (!user.phoneVerified) {
-      return res.status(403).json({
-        success: false,
-        message: 'Please verify your phone number with OTP first',
-        requiresVerification: true,
-        phone: user.phone,
-      });
-    }
-
     const validPassword = await bcrypt.compare(
       password,
       user.passwordHash
@@ -211,90 +149,6 @@ const loginUser = async (req, res, next) => {
         phone: user.phone,
         role: user.role,
         phoneVerified: user.phoneVerified,
-        pushToken: user.pushToken,
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-const sendOtp = async (req, res, next) => {
-  try {
-    const phone = normalizePhone(req.body.phone);
-
-    if (!phone) {
-      return res.status(400).json({
-        success: false,
-        message: 'Phone number is required',
-      });
-    }
-
-    const user = await User.findOne({ phone });
-
-    if (!user) {
-      return res.status(200).json({
-        success: true,
-        message: 'If an account exists, an OTP has been sent',
-      });
-    }
-
-    await sendPhoneOtp(phone);
-
-    res.json({
-      success: true,
-      message: 'OTP sent successfully',
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-const verifyOtp = async (req, res, next) => {
-  try {
-    const phone = normalizePhone(req.body.phone);
-    const code = String(req.body.code || '').trim();
-
-    if (!phone || !code) {
-      return res.status(400).json({
-        success: false,
-        message: 'Phone number and OTP are required',
-      });
-    }
-
-    const user = await User.findOne({ phone });
-
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid OTP',
-      });
-    }
-
-    const result = await verifyPhoneOtp(phone, code);
-
-    if (result.status !== 'approved') {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid or expired OTP',
-      });
-    }
-
-    user.phoneVerified = true;
-    await user.save();
-
-    const token = generateToken(user._id);
-
-    res.json({
-      success: true,
-      token,
-      user: {
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        role: user.role,
-        phoneVerified: true,
         pushToken: user.pushToken,
       },
     });
@@ -360,8 +214,6 @@ const updateProfile = async (req, res, next) => {
 module.exports = {
   registerUser,
   loginUser,
-  sendOtp,
-  verifyOtp,
   getMe,
   updateProfile,
 };
