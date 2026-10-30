@@ -53,8 +53,6 @@ app.post('/api/payment/webhook', express.raw({ type: 'application/json' }), hand
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Connect to MongoDB
-connectDB();
 
 // API Health Check Endpoint
 app.get('/', (req, res) => {
@@ -87,14 +85,15 @@ const seedInitialData = async () => {
     const User = require('./models/User');
     const bcrypt = require('bcryptjs');
 
+    const seedImage = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22160%22 height=%22160%22%3E%3Crect width=%22160%22 height=%22160%22 fill=%22%23fff3e0%22/%3E%3Ctext x=%2280%22 y=%22100%22 font-size=%2264%22 text-anchor=%22middle%22%3E%F0%9F%8C%AF%3C/text%3E%3C/svg%3E';
     const catCount = await Category.countDocuments();
     if (catCount === 0) {
       console.log('[Seeder] Seeding initial Wrapchik categories and menu items...');
 
-      const wrapsCat = await Category.create({ name: 'Wraps', displayOrder: 1 });
-      const burgersCat = await Category.create({ name: 'Burgers', displayOrder: 2 });
-      const friesCat = await Category.create({ name: 'Fries & Sides', displayOrder: 3 });
-      const drinksCat = await Category.create({ name: 'Drinks & Shakes', displayOrder: 4 });
+      const wrapsCat = await Category.create({ imageUrl: seedImage, name: 'Wraps', displayOrder: 1 });
+      const burgersCat = await Category.create({ imageUrl: seedImage, name: 'Burgers', displayOrder: 2 });
+      const friesCat = await Category.create({ imageUrl: seedImage, name: 'Fries & Sides', displayOrder: 3 });
+      const drinksCat = await Category.create({ imageUrl: seedImage, name: 'Drinks & Shakes', displayOrder: 4 });
 
       await Product.create([
         {
@@ -102,6 +101,7 @@ const seedInitialData = async () => {
           description: 'Grilled paneer cubes marinated in rich tandoori spices.',
           price: 120,
           categoryId: wrapsCat._id,
+          imageUrl: seedImage,
           isVeg: true,
           available: true,
         },
@@ -110,12 +110,27 @@ const seedInitialData = async () => {
           description: 'Juicy spiced veg patty topped with cheddar cheese.',
           price: 80,
           categoryId: burgersCat._id,
+          imageUrl: seedImage,
           isVeg: true,
           available: true,
         },
       ]);
 
       console.log('[Seeder] Default Wrapchik menu items successfully seeded!');
+    }
+
+    if (process.env.ENABLE_DEMO_LOGIN === 'true') {
+      const email = 'demo@wrapchik.example';
+      if (!(await User.findOne({ email }))) {
+        await User.create({
+          name: 'Demo Student',
+          email,
+          phone: '0000000000',
+          passwordHash: await bcrypt.hash('WrapchikDemo2026!', 12),
+          role: 'student',
+        });
+        console.log('[Seeder] Shared demo student created.');
+      }
     }
 
     if (process.env.SEED_DEMO_ACCOUNTS === 'true') {
@@ -161,8 +176,8 @@ const seedInitialData = async () => {
   }
 };
 
-// Seed initial data
-seedInitialData();
+// Seed only after the database connection is ready.
+const databaseReady = connectDB().then(seedInitialData);
 
 // Error handler (last middleware)
 app.use(errorHandler);
@@ -205,6 +220,11 @@ io.on('connection', (socket) => {
   });
 });
 
-httpServer.listen(PORT, '0.0.0.0', () => {
-  console.log(`[Wrapchik Server] Running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
+databaseReady.then(() => {
+  httpServer.listen(PORT, '0.0.0.0', () => {
+    console.log(`[Wrapchik Server] Running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
+  });
+}).catch(error => {
+  console.error('[Startup]', error.message);
+  process.exit(1);
 });
