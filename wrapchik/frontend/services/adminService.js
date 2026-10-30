@@ -13,6 +13,8 @@ const adminService = {
     return api.get('/admin/analytics');
   },
 
+  getSettings: () => api.get('/settings'),
+
   updateSettings: (data) => {
     return api.put('/settings', data);
   },
