@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } 
 import { useRouter } from 'expo-router';
 import { ShoppingBag, Clock, CheckCircle2, IndianRupee, Layers, Package, ArrowRight } from 'lucide-react-native';
 import Header from '../../components/common/Header';
+import Button from '../../components/common/Button';
 import LoadingIndicator from '../../components/common/LoadingIndicator';
 import adminService from '../../services/adminService';
 import { AuthContext } from '../../context/AuthContext';
@@ -11,6 +12,8 @@ import COLORS from '../../constants/colors';
 export default function AdminDashboardScreen() {
   const router = useRouter();
   const { logout } = useContext(AuthContext);
+  const [error, setError] = useState('');
+  const [savingSettings, setSavingSettings] = useState(false);
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -22,31 +25,12 @@ export default function AdminDashboardScreen() {
   const fetchAnalytics = async () => {
     try {
       setLoading(true);
-      const res = await adminService.getAnalytics();
-      if (res && res.analytics) {
-        setAnalytics(res.analytics);
-      } else {
-        setAnalytics({
-          totalOrders: 0,
-          todayOrders: 0,
-          pendingOrders: 0,
-          completedOrders: 0,
-          totalProducts: 0,
-          totalRevenue: 0,
-          todayRevenue: 0,
-        });
-      }
+      setError('');
+      const [res, settingsRes] = await Promise.all([adminService.getAnalytics(), adminService.getSettings()]);
+      if (!res?.analytics || !settingsRes?.settings) throw new Error('Unable to load shop data. Please retry.');
+      setAnalytics({ ...res.analytics, settings: settingsRes.settings });
     } catch (e) {
-      console.error('[Admin Dashboard Fetch Error]:', e);
-      setAnalytics({
-        totalOrders: 0,
-        todayOrders: 0,
-        pendingOrders: 0,
-        completedOrders: 0,
-        totalProducts: 0,
-        totalRevenue: 0,
-        todayRevenue: 0,
-      });
+      setError(e.message || 'Unable to load shop data.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -63,14 +47,22 @@ export default function AdminDashboardScreen() {
   }
 
   const toggleAcceptingOrders = async () => {
+    if (savingSettings || !analytics?.settings) return;
+    setSavingSettings(true);
+    setError('');
     try {
-      const newStatus = !analytics?.settings?.acceptingOrders;
-      await adminService.updateSettings({ acceptingOrders: newStatus });
-      setAnalytics(prev => ({ ...prev, settings: { ...prev.settings, acceptingOrders: newStatus } }));
+      const res = await adminService.updateSettings({ acceptingOrders: !analytics.settings.acceptingOrders });
+      if (!res?.settings) throw new Error('Unable to save shop settings.');
+      setAnalytics(prev => ({ ...prev, settings: res.settings }));
     } catch (e) {
-      console.error(e);
+      setError(e.message || 'Unable to save shop settings.');
+    } finally {
+      setSavingSettings(false);
     }
   };
+  if (!analytics) {
+    return <View style={{flex:1,padding:24,justifyContent:'center'}}><Text accessibilityRole="alert" style={{color:COLORS.danger,marginBottom:16}}>{error}</Text><Button title="Retry" onPress={fetchAnalytics} /></View>;
+  }
 
   return (
     <View style={styles.container}>
@@ -82,9 +74,15 @@ export default function AdminDashboardScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={[COLORS.primary]} />
         }
       >
+        {error ? <Text accessibilityRole="alert" style={{color:COLORS.danger,marginBottom:12}}>{error}</Text> : null}
+        <Button title="Refresh dashboard" variant="outline" onPress={handleRefresh} loading={refreshing} style={{marginBottom:12}} />
         <View style={styles.quickToggleRow}>
           <Text style={styles.quickToggleText}>Accepting Orders</Text>
           <TouchableOpacity
+            accessibilityRole="switch"
+            accessibilityLabel="Accepting Orders"
+            accessibilityState={{checked:!!analytics.settings.acceptingOrders,disabled:savingSettings}}
+            disabled={savingSettings}
             activeOpacity={0.8}
             onPress={toggleAcceptingOrders}
             style={[styles.toggleContainer, analytics?.settings?.acceptingOrders ? styles.toggleOn : styles.toggleOff]}

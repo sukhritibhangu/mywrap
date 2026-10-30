@@ -11,6 +11,8 @@ import COLORS from '../../constants/colors';
 
 export default function AdminOrdersScreen() {
   const { socket } = React.useContext(SocketContext);
+  const [error, setError] = useState('');
+  const [updatingId, setUpdatingId] = useState(null);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -41,6 +43,7 @@ export default function AdminOrdersScreen() {
   const fetchAdminOrders = async () => {
     try {
       setLoading(true);
+      setError('');
       const params = selectedFilter !== 'ALL' ? { status: selectedFilter } : {};
       const res = await adminService.getAllOrders(params);
 
@@ -50,8 +53,7 @@ export default function AdminOrdersScreen() {
         setOrders([]);
       }
     } catch (e) {
-      console.error('[Admin Orders Fetch Error]:', e);
-      setOrders([]);
+      setError(e.message || 'Unable to load orders.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -64,27 +66,17 @@ export default function AdminOrdersScreen() {
   };
 
   const handleUpdateStatus = async (orderId, newStatus, reason = '') => {
+    if (updatingId) return;
+    setUpdatingId(orderId);
+    setError('');
     try {
-      // Instant state update for seamless response
-      setOrders((prev) =>
-        prev.map((o) => (o._id === orderId ? { ...o, orderStatus: newStatus } : o))
-      );
-
-      const targetOrder = orders.find((o) => o._id === orderId);
-      const orderNum = targetOrder ? targetOrder.orderNumber : orderId;
-      const msg = `Order #${orderNum} status updated to ${newStatus}!`;
-
-      if (typeof window !== 'undefined') {
-        alert(msg);
-      } else {
-        Alert.alert('Status Updated', msg);
-      }
-
-      if (orderId && !orderId.startsWith('ord')) {
-        await adminService.updateOrderStatus(orderId, newStatus, reason).catch(() => null);
-      }
+      const res = await adminService.updateOrderStatus(orderId, newStatus, reason);
+      if (!res?.order) throw new Error('Order update was not confirmed.');
+      setOrders(prev => prev.map(order => order._id === orderId ? res.order : order));
     } catch (e) {
-      console.error('[Update Order Status Error]:', e);
+      setError(e.message || 'Unable to update order.');
+    } finally {
+      setUpdatingId(null);
     }
   };
 
@@ -109,6 +101,8 @@ export default function AdminOrdersScreen() {
     <View style={styles.container}>
       <Header title="Manage Orders" showBack showCart={false} />
 
+      {error ? <View style={{padding:16}}><Text accessibilityRole="alert" style={{color:COLORS.danger}}>{error}</Text><Button title="Retry" onPress={fetchAdminOrders} /></View> : null}
+      <Button title="Refresh orders" variant="outline" onPress={handleRefresh} loading={refreshing} />
       {/* Filter Tabs */}
       <View style={styles.filterRow}>
         {['ALL', 'PLACED', 'PREPARING', 'READY', 'COMPLETED'].map((filter) => (
@@ -126,7 +120,7 @@ export default function AdminOrdersScreen() {
 
       {loading && !refreshing ? (
         <LoadingIndicator message="Fetching incoming orders..." />
-      ) : orders.length === 0 ? (
+      ) : error && orders.length === 0 ? null : orders.length === 0 ? (
         <EmptyState title="No Orders" message="No orders match the selected status filter." />
       ) : (
         <FlatList
@@ -177,12 +171,14 @@ export default function AdminOrdersScreen() {
                       <Button
                         title="Accept"
                         onPress={() => handleUpdateStatus(item._id, 'ACCEPTED')}
+                        disabled={!!updatingId}
                         style={styles.actionBtnSmall}
                       />
                       <Button
                         title="Reject"
                         variant="danger"
                         onPress={() => handleRejectOrder(item._id)}
+                        disabled={!!updatingId}
                         style={styles.actionBtnSmall}
                       />
                     </>
@@ -192,6 +188,7 @@ export default function AdminOrdersScreen() {
                     <Button
                       title="Start Preparing"
                       onPress={() => handleUpdateStatus(item._id, 'PREPARING')}
+                      disabled={!!updatingId}
                       style={styles.actionBtnFull}
                     />
                   )}
@@ -200,6 +197,7 @@ export default function AdminOrdersScreen() {
                     <Button
                       title={item.orderType === 'DINE_IN' ? "Mark as Served" : "Mark Ready for Pickup"}
                       onPress={() => handleUpdateStatus(item._id, item.orderType === 'DINE_IN' ? 'SERVED' : 'READY')}
+                      disabled={!!updatingId}
                       style={styles.actionBtnFull}
                     />
                   )}
@@ -208,6 +206,7 @@ export default function AdminOrdersScreen() {
                     <Button
                       title={item.orderType === 'DELIVERY' ? "Mark Picked Up" : "Mark Completed"}
                       onPress={() => handleUpdateStatus(item._id, item.orderType === 'DELIVERY' ? 'PICKED_UP' : 'COMPLETED')}
+                      disabled={!!updatingId}
                       style={styles.actionBtnFull}
                     />
                   )}
@@ -216,6 +215,7 @@ export default function AdminOrdersScreen() {
                     <Button
                       title="Mark Delivered"
                       onPress={() => handleUpdateStatus(item._id, 'DELIVERED')}
+                      disabled={!!updatingId}
                       style={styles.actionBtnFull}
                     />
                   )}
@@ -224,6 +224,7 @@ export default function AdminOrdersScreen() {
                     <Button
                       title="Mark Completed"
                       onPress={() => handleUpdateStatus(item._id, 'COMPLETED')}
+                      disabled={!!updatingId}
                       style={styles.actionBtnFull}
                     />
                   )}
