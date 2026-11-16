@@ -1,5 +1,5 @@
 const RestaurantSettings = require('../models/RestaurantSettings');
-const { isValidUpiId } = require('../utils/upiPayment');
+const { isValidUpiId, isValidUpiQrImage } = require('../utils/upiPayment');
 
 const getSettings = async (req, res, next) => {
   try {
@@ -11,16 +11,11 @@ const getSettings = async (req, res, next) => {
 const updateSettings = async (req, res, next) => {
   try {
     const body = req.body || {};
-    for (const key of ['upiId', 'upiPayeeName', 'upiQrImageUrl']) {
-      if (body[key] !== undefined && (typeof body[key] !== 'string' || body[key].length > (key === 'upiQrImageUrl' ? 1000 : 120))) return res.status(400).json({ success: false, message: `${key} must be a string within the allowed length` });
+    for (const key of ['upiId', 'upiPayeeName']) {
+      if (body[key] !== undefined && (typeof body[key] !== 'string' || body[key].length > 120)) return res.status(400).json({ success: false, message: `${key} must be a string within the allowed length` });
     }
     if (body.upiId !== undefined && body.upiId && !isValidUpiId(body.upiId)) return res.status(400).json({ success: false, message: 'Enter a valid UPI ID.' });
-    if (body.upiQrImageUrl) {
-      try {
-        const url = new URL(body.upiQrImageUrl);
-        if (url.protocol !== 'https:') throw new Error('https required');
-      } catch { return res.status(400).json({ success: false, message: 'UPI QR image URL must be a valid HTTPS URL.' }); }
-    }
+    if (body.upiQrImageUrl !== undefined && !isValidUpiQrImage(body.upiQrImageUrl)) return res.status(400).json({ success: false, message: 'Choose a PNG, JPEG or WebP QR image up to 512 KB, or enter a valid HTTPS image URL.' });
     const { acceptingOrders, openTime, closeTime, busyStatus, deliveryEnabled, dineInEnabled, takeawayEnabled, estimatedPrepMinutes, deliveryFee } = body;
     for (const key of ['acceptingOrders', 'deliveryEnabled', 'dineInEnabled', 'takeawayEnabled', 'upiEnabled', 'cashEnabled']) {
       if (body[key] !== undefined && typeof body[key] !== 'boolean') return res.status(400).json({ success: false, message: `${key} must be a boolean` });

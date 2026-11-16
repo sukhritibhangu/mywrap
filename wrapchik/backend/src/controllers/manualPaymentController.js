@@ -14,8 +14,11 @@ const getUpiInstructions = async (req, res, next) => {
     if (['CANCELLED', 'REJECTED'].includes(order.orderStatus)) return res.status(409).json({ success: false, message: 'This order is closed.' });
     const settings = await RestaurantSettings.getSettings();
     if (!isUpiConfigured(settings)) return res.status(503).json({ success: false, message: 'UPI payment is not enabled or configured by the outlet.' });
-    const upiUri = createUpiPaymentUri({ upiId: settings.upiId, payeeName: settings.upiPayeeName, amount: order.totalAmount, orderId: order._id, orderNumber: order.orderNumber });
-    return res.json({ success: true, instructions: { upiUri, upiId: settings.upiId, payeeName: settings.upiPayeeName, amount: order.totalAmount, currency: 'INR', orderId: String(order._id), orderNumber: order.orderNumber, paymentStatus: order.paymentStatus, paymentReference: String(order._id) } });
+    const qrImageUrl = settings.upiQrImageUrl || '';
+    // A preset QR is the sole payment destination shown for this mode. Do not
+    // launch a separately generated URI that could point to a different payee.
+    const upiUri = qrImageUrl ? null : createUpiPaymentUri({ upiId: settings.upiId, payeeName: settings.upiPayeeName, amount: order.totalAmount, orderId: order._id, orderNumber: order.orderNumber });
+    return res.json({ success: true, instructions: { upiUri, qrImageUrl, qrMode: qrImageUrl ? 'ADMIN_IMAGE' : 'GENERATED', upiId: settings.upiId, payeeName: settings.upiPayeeName, amount: order.totalAmount, currency: 'INR', orderId: String(order._id), orderNumber: order.orderNumber, paymentStatus: order.paymentStatus, paymentReference: String(order._id) } });
   } catch (error) { return next(error); }
 };
 
