@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, RefreshControl, TouchableOpacity, Alert } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { View, Text, StyleSheet, FlatList, RefreshControl, TouchableOpacity, Alert, ScrollView, TextInput } from 'react-native';
 import Header from '../../components/common/Header';
 import StatusBadge from '../../components/common/StatusBadge';
 import Button from '../../components/common/Button';
@@ -11,72 +11,157 @@ import COLORS from '../../constants/colors';
 
 export default function AdminOrdersScreen() {
   const { socket } = React.useContext(SocketContext);
-  const [error, setError] = useState('');
-  const [updatingId, setUpdatingId] = useState(null);
   const [orders, setOrders] = useState([]);
+  const [upiClaims, setUpiClaims] = useState([]);
+  const [rejectingUpiId, setRejectingUpiId] = useState('');
+  const [upiRejectReason, setUpiRejectReason] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState('ALL');
+  const [loadError, setLoadError] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const pageRef = useRef(1);
+  const pagingRef = useRef(false);
+  const refreshTimerRef = useRef(null);
 
-  useEffect(() => {
-    fetchAdminOrders();
-  }, [selectedFilter]);
-
-  useEffect(() => {
-    if (!socket) return;
-    const handleNewOrder = (data) => {
-      fetchAdminOrders();
-    };
-    const handleOrderUpdate = (data) => {
-      setOrders(prev => prev.map(o => 
-        o._id === data.orderId ? { ...o, orderStatus: data.orderStatus } : o
-      ));
-    };
-    socket.on('new_order', handleNewOrder);
-    socket.on('order_updated', handleOrderUpdate);
-    return () => {
-      socket.off('new_order', handleNewOrder);
-      socket.off('order_updated', handleOrderUpdate);
-    };
-  }, [socket]);
-
-  const fetchAdminOrders = async () => {
+  const fetchAdminOrders = useCallback(async ({ quiet = false, append = false } = {}) => {
+    if (append && pagingRef.current) return;
+    if (append) pagingRef.current = true;
     try {
-      setLoading(true);
-      setError('');
-      const params = selectedFilter !== 'ALL' ? { status: selectedFilter } : {};
+      if (!quiet) setLoading(true);
+      const page = append ? pageRef.current + 1 : 1;
+      const params = { page, ...(selectedFilter !== 'ALL' ? { status: selectedFilter } : {}) };
       const res = await adminService.getAllOrders(params);
 
-      if (res && res.orders) {
-        setOrders(res.orders);
+      if (res?.success && Array.isArray(res.orders)) {
+        setOrders((current) => append ? [...current, ...res.orders] : res.orders);
+        pageRef.current = page;
+        setHasMore(page < (Number(res.pages) || 1));
+        setLoadError(false);
       } else {
-        setOrders([]);
+        throw new Error(res?.message || 'Order queue could not be loaded.');
       }
     } catch (e) {
-      setError(e.message || 'Unable to load orders.');
+      console.warn('[Admin Orders Fetch Error]:', e);
+      setLoadError(true);
     } finally {
-      setLoading(false);
+      if (!quiet) setLoading(false);
       setRefreshing(false);
+      pagingRef.current = false;
     }
-  };
+  }, [selectedFilter]);
+
+  const fetchUpiClaims = useCallback(async () => {
+    try {
+      const result = await adminService.getPendingUpiPayments();
+      setUpiClaims(Array.isArray(result?.payments) ? result.payments : []);
+    } catch (e) { console.warn('[UPI review queue]:', e.message); }
+  }, []);
+
+  useEffect(() => {
+    pageRef.current = 1;
+    fetchAdminOrders();
+  }, [fetchAdminOrders]);
+
+  useEffect(() => { fetchUpiClaims(); }, [fetchUpiClaims]);
+
+  useEffect(() => {
+    if (!socket) return undefined;
+    const scheduleRefresh = () => {
+      clearTimeout(refreshTimerRef.current);
+      refreshTimerRef.current = setTimeout(() => { fetchAdminOrders({ quiet: true }); fetchUpiClaims(); }, 120);
+    };
+    socket.on('new_order', scheduleRefresh);
+    socket.on('order_updated', scheduleRefresh);
+    socket.on('connect', scheduleRefresh);
+    return () => {
+      clearTimeout(refreshTimerRef.current);
+      socket.off('new_order', scheduleRefresh);
+      socket.off('order_updated', scheduleRefresh);
+      socket.off('connect', scheduleRefresh);
+    };
+  }, [socket, fetchAdminOrders, fetchUpiClaims]);
 
   const handleRefresh = () => {
     setRefreshing(true);
     fetchAdminOrders();
+    fetchUpiClaims();
   };
 
   const handleUpdateStatus = async (orderId, newStatus, reason = '') => {
-    if (updatingId) return;
-    setUpdatingId(orderId);
-    setError('');
     try {
-      const res = await adminService.updateOrderStatus(orderId, newStatus, reason);
-      if (!res?.order) throw new Error('Order update was not confirmed.');
-      setOrders(prev => prev.map(order => order._id === orderId ? res.order : order));
+      const targetOrder = orders.find((o) => o._id === orderId);
+      const orderNum = targetOrder ? targetOrder.orderNumber : orderId;
+      await adminService.updateOrderStatus(orderId, newStatus, reason);
+      await fetchAdminOrders();
+      const message = `Order #${orderNum} status updated to ${newStatus}.`;
+      if (typeof window !== 'undefined') window.alert(message);
+      else Alert.alert('Status Updated', message);
     } catch (e) {
-      setError(e.message || 'Unable to update order.');
-    } finally {
-      setUpdatingId(null);
+      console.error('[Update Order Status Error]:', e);
+      const message = e.message || 'Could not update the order. Refresh and try again.';
+      if (typeof window !== 'undefined') window.alert(message);
+      else Alert.alert('Update Failed', message);
+    }
+  };
+
+  const handleConfirmCounterPayment = async (orderId) => {
+    const confirmMessage = 'Confirm that cash was received for this order? This marks the payment as paid.';
+    const confirmed = typeof window !== 'undefined'
+      ? window.confirm(confirmMessage)
+      : await new Promise((resolve) => Alert.alert('Confirm Cash Payment', confirmMessage, [
+          { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+          { text: 'Confirm Received', onPress: () => resolve(true) },
+        ]));
+    if (!confirmed) return;
+
+    try {
+      await adminService.confirmCounterPayment(orderId);
+      await fetchAdminOrders();
+      if (typeof window !== 'undefined') window.alert('Counter payment confirmed.');
+      else Alert.alert('Payment Confirmed', 'Counter payment confirmed.');
+    } catch (e) {
+      const message = e.message || 'Could not confirm this payment.';
+      if (typeof window !== 'undefined') window.alert(message);
+      else Alert.alert('Payment Not Confirmed', message);
+    }
+  };
+
+  const handleReviewUpi = async (claim, action) => {
+    const order = claim.orderId;
+    if (action === 'REJECT') {
+      setRejectingUpiId(claim._id);
+      setUpiRejectReason('');
+      return;
+    }
+    if (action === 'VERIFY') {
+      const confirmed = typeof window !== 'undefined'
+        ? window.confirm(`Confirm you verified receipt of ₹${claim.amount} for order #${order?.orderNumber}?`)
+        : await new Promise(resolve => Alert.alert('Verify UPI payment', `Confirm receipt of ₹${claim.amount} for order #${order?.orderNumber}?`, [
+          { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+          { text: 'Confirm verified', onPress: () => resolve(true) },
+        ]));
+      if (!confirmed) return;
+    }
+    try {
+      await adminService.reviewUpiPayment(claim._id, action);
+      await Promise.all([fetchUpiClaims(), fetchAdminOrders({ quiet: true })]);
+    } catch (error) {
+      const message = error.message || 'Could not review this UPI payment.';
+      if (typeof window !== 'undefined') window.alert(message); else Alert.alert('Payment review failed', message);
+    }
+  };
+
+  const submitUpiRejection = async (claim) => {
+    const reason = upiRejectReason.trim();
+    if (!reason) return;
+    try {
+      await adminService.reviewUpiPayment(claim._id, 'REJECT', reason);
+      setRejectingUpiId(''); setUpiRejectReason('');
+      await Promise.all([fetchUpiClaims(), fetchAdminOrders({ quiet: true })]);
+    } catch (error) {
+      const message = error.message || 'Could not reject this UPI claim.';
+      if (typeof window !== 'undefined') window.alert(message); else Alert.alert('Payment review failed', message);
     }
   };
 
@@ -99,13 +184,30 @@ export default function AdminOrdersScreen() {
 
   return (
     <View style={styles.container}>
-      <Header title="Manage Orders" showBack showCart={false} />
+      <Header title="Kitchen & order desk" showBack showCart={false} />
 
-      {error ? <View style={{padding:16}}><Text accessibilityRole="alert" style={{color:COLORS.danger}}>{error}</Text><Button title="Retry" onPress={fetchAdminOrders} /></View> : null}
-      <Button title="Refresh orders" variant="outline" onPress={handleRefresh} loading={refreshing} />
+      {upiClaims.length > 0 ? <View style={styles.upiQueue}>
+        <Text style={styles.upiTitle}>UPI claims awaiting verification · {upiClaims.length}</Text>
+        {upiClaims.map(claim => <View key={claim._id} style={styles.upiClaim}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.upiOrder}>#{claim.orderId?.orderNumber || 'Order'} · ₹{claim.amount}</Text>
+            <Text style={styles.upiMeta}>{claim.orderId?.customerSnapshot?.name || claim.orderId?.userId?.name || 'Customer'} · Ref {claim.upiTransactionReference}</Text>
+            {rejectingUpiId === claim._id ? <View style={styles.rejectForm}>
+              <TextInput value={upiRejectReason} onChangeText={setUpiRejectReason} placeholder="Reason for rejecting this claim" maxLength={500} style={styles.rejectReasonInput} />
+              <TouchableOpacity style={[styles.upiAction, styles.upiReject]} disabled={!upiRejectReason.trim()} onPress={() => submitUpiRejection(claim)}><Text style={styles.upiRejectText}>Submit reason</Text></TouchableOpacity>
+              <TouchableOpacity onPress={() => { setRejectingUpiId(''); setUpiRejectReason(''); }}><Text style={styles.upiCancelText}>Keep pending</Text></TouchableOpacity>
+            </View> : null}
+          </View>
+          <View style={styles.upiActions}>
+            <TouchableOpacity style={[styles.upiAction, styles.upiApprove]} onPress={() => handleReviewUpi(claim, 'VERIFY')}><Text style={styles.upiApproveText}>Verify received</Text></TouchableOpacity>
+            <TouchableOpacity style={[styles.upiAction, styles.upiReject]} onPress={() => handleReviewUpi(claim, 'REJECT')}><Text style={styles.upiRejectText}>Reject</Text></TouchableOpacity>
+          </View>
+        </View>)}
+      </View> : null}
+
       {/* Filter Tabs */}
-      <View style={styles.filterRow}>
-        {['ALL', 'PLACED', 'PREPARING', 'READY', 'COMPLETED'].map((filter) => (
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+        {['ALL', 'PLACED', 'ACCEPTED', 'PREPARING', 'READY', 'COMPLETED', 'PICKED_UP', 'DELIVERED', 'SERVED', 'REJECTED', 'CANCELLED'].map((filter) => (
           <TouchableOpacity
             key={filter}
             onPress={() => setSelectedFilter(filter)}
@@ -116,20 +218,23 @@ export default function AdminOrdersScreen() {
             </Text>
           </TouchableOpacity>
         ))}
-      </View>
+      </ScrollView>
 
       {loading && !refreshing ? (
         <LoadingIndicator message="Fetching incoming orders..." />
-      ) : error && orders.length === 0 ? null : orders.length === 0 ? (
-        <EmptyState title="No Orders" message="No orders match the selected status filter." />
+      ) : orders.length === 0 ? (
+        <EmptyState title={loadError ? 'Order queue unavailable' : 'No Orders'} message={loadError ? 'Check your connection and refresh. Existing order data is preserved when a refresh fails.' : 'No orders match the selected status filter.'} buttonTitle={loadError ? 'Refresh' : undefined} onButtonPress={loadError ? handleRefresh : undefined} />
       ) : (
         <FlatList
           data={orders}
+          ListHeaderComponent={loadError ? <Text style={styles.refreshWarning}>Could not refresh the queue. Showing the last loaded orders.</Text> : null}
           keyExtractor={(item) => item._id}
           contentContainerStyle={styles.listContent}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={[COLORS.primary]} />
           }
+          onEndReached={() => { if (hasMore && !loading) fetchAdminOrders({ quiet: true, append: true }); }}
+          onEndReachedThreshold={0.45}
           renderItem={({ item }) => (
             <View style={styles.orderCard}>
               <View style={styles.cardHeader}>
@@ -144,43 +249,69 @@ export default function AdminOrdersScreen() {
                       {item.orderType || 'TAKEAWAY'}
                     </Text>
                     <Text style={styles.customerName}>
-                      👤 {item.userId?.name || 'Student'} • 📱 {item.userId?.phone || 'N/A'}
+                      👤 {item.customerSnapshot?.name || item.userId?.name || 'Student'} • 📱 {item.customerSnapshot?.phone || item.userId?.phone || 'N/A'}
                     </Text>
+                    {item.customerSnapshot?.email || item.userId?.email ? <Text style={styles.customerName}>{item.customerSnapshot?.email || item.userId?.email}</Text> : null}
                   </View>
                 </View>
-                <StatusBadge status={item.orderStatus} />
+                <View style={styles.statusBadges}><StatusBadge status={item.orderStatus} /><StatusBadge status={item.paymentStatus || 'PENDING'} /></View>
               </View>
+
+              <Text style={styles.orderTime}>Placed {new Date(item.createdAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</Text>
 
               <View style={styles.divider} />
 
               <View style={styles.itemsSummary}>
                 {item.items?.map((it, idx) => (
-                  <Text key={idx} style={styles.itemText}>
-                    {it.quantity} × {it.name} (₹{it.priceAtPurchase * it.quantity})
-                  </Text>
+                  <View key={`${it.productId || it.name}-${idx}`} style={styles.itemSummaryRow}>
+                    <Text style={styles.itemText}>{it.quantity} × {it.name} (₹{it.itemTotal ?? it.priceAtPurchase * it.quantity})</Text>
+                    {it.customizations?.length ? <Text style={styles.customizationText}>Add-ons: {it.customizations.map((customization) => customization.name).join(', ')}</Text> : null}
+                  </View>
                 ))}
               </View>
 
+              <Text style={styles.fulfillmentText}>
+                {item.orderType === 'DELIVERY' ? `Delivery · ${[item.hostel, item.roomNumber].filter(Boolean).join(' / ')}` : item.orderType === 'DINE_IN' ? `Dine-in · ${item.tableId?.label || `Table ${item.tableId?.tableNumber || ''}`}` : `Pickup · ${item.pickupLocation || 'Wrapchik counter'} · ${item.pickupTimeSlot || 'Immediate'}`}
+              </Text>
+              {Number(item.discountAmount) > 0 ? <Text style={styles.customizationText}>Coupon {item.couponCode || ''} · −₹{item.discountAmount}</Text> : null}
+              {item.deliveryInstructions ? <Text style={styles.customizationText}>Customer instructions: {item.deliveryInstructions}</Text> : null}
+
               <View style={styles.cardFooter}>
                 <Text style={styles.totalVal}>Total: ₹{item.totalAmount}</Text>
+                <Text style={styles.paymentStatus}>Payment: {item.paymentStatus || 'PENDING'} ({item.paymentMethod === 'UPI_QR' ? 'UPI' : (item.paymentMethod || 'COUNTER') === 'COUNTER' ? 'Cash at counter' : item.paymentMethod})</Text>
+
+                {['RAZORPAY', 'CASHFREE', 'UPI_QR'].includes(item.paymentMethod) && item.paymentStatus !== 'SUCCESS' && ['PLACED', 'ACCEPTED', 'PREPARING'].includes(item.orderStatus) ? (
+                  <Text style={styles.paymentGateNote}>Awaiting verified {item.paymentMethod === 'CASHFREE' ? 'legacy Cashfree' : item.paymentMethod === 'UPI_QR' ? 'UPI' : 'legacy Razorpay'} payment. Kitchen acceptance stays locked.</Text>
+                ) : null}
+
+                {(item.paymentMethod || 'COUNTER') === 'COUNTER' && item.paymentStatus !== 'SUCCESS' && !['CANCELLED', 'REJECTED'].includes(item.orderStatus) && (
+                  <Button
+                    title="Confirm cash received"
+                    variant="outline"
+                    onPress={() => handleConfirmCounterPayment(item._id)}
+                    style={styles.actionBtnFull}
+                  />
+                )}
 
                 {/* State Machine Action Controls */}
                 <View style={styles.actionsRow}>
                   {item.orderStatus === 'PLACED' && (
                     <>
-                      <Button
-                        title="Accept"
-                        onPress={() => handleUpdateStatus(item._id, 'ACCEPTED')}
-                        disabled={!!updatingId}
-                        style={styles.actionBtnSmall}
-                      />
-                      <Button
-                        title="Reject"
-                        variant="danger"
-                        onPress={() => handleRejectOrder(item._id)}
-                        disabled={!!updatingId}
-                        style={styles.actionBtnSmall}
-                      />
+                      {(!['RAZORPAY', 'CASHFREE', 'UPI_QR'].includes(item.paymentMethod) || item.paymentStatus === 'SUCCESS') ? (
+                        <Button
+                          title="Accept"
+                          onPress={() => handleUpdateStatus(item._id, 'ACCEPTED')}
+                          style={styles.actionBtnSmall}
+                        />
+                      ) : null}
+                      {item.paymentStatus !== 'SUCCESS' ? (
+                        <Button
+                          title="Reject"
+                          variant="danger"
+                          onPress={() => handleRejectOrder(item._id)}
+                          style={styles.actionBtnSmall}
+                        />
+                      ) : <Text style={styles.paymentGateNote}>Paid orders cannot be rejected here because refunds are not enabled.</Text>}
                     </>
                   )}
 
@@ -188,7 +319,6 @@ export default function AdminOrdersScreen() {
                     <Button
                       title="Start Preparing"
                       onPress={() => handleUpdateStatus(item._id, 'PREPARING')}
-                      disabled={!!updatingId}
                       style={styles.actionBtnFull}
                     />
                   )}
@@ -197,7 +327,6 @@ export default function AdminOrdersScreen() {
                     <Button
                       title={item.orderType === 'DINE_IN' ? "Mark as Served" : "Mark Ready for Pickup"}
                       onPress={() => handleUpdateStatus(item._id, item.orderType === 'DINE_IN' ? 'SERVED' : 'READY')}
-                      disabled={!!updatingId}
                       style={styles.actionBtnFull}
                     />
                   )}
@@ -206,7 +335,6 @@ export default function AdminOrdersScreen() {
                     <Button
                       title={item.orderType === 'DELIVERY' ? "Mark Picked Up" : "Mark Completed"}
                       onPress={() => handleUpdateStatus(item._id, item.orderType === 'DELIVERY' ? 'PICKED_UP' : 'COMPLETED')}
-                      disabled={!!updatingId}
                       style={styles.actionBtnFull}
                     />
                   )}
@@ -215,7 +343,6 @@ export default function AdminOrdersScreen() {
                     <Button
                       title="Mark Delivered"
                       onPress={() => handleUpdateStatus(item._id, 'DELIVERED')}
-                      disabled={!!updatingId}
                       style={styles.actionBtnFull}
                     />
                   )}
@@ -224,7 +351,6 @@ export default function AdminOrdersScreen() {
                     <Button
                       title="Mark Completed"
                       onPress={() => handleUpdateStatus(item._id, 'COMPLETED')}
-                      disabled={!!updatingId}
                       style={styles.actionBtnFull}
                     />
                   )}
@@ -239,6 +365,18 @@ export default function AdminOrdersScreen() {
 }
 
 const styles = StyleSheet.create({
+  upiQueue: { marginHorizontal: 14, marginTop: 8, padding: 14, backgroundColor: '#FFF8F3', borderRadius: 14, borderWidth: 1, borderColor: '#F2D7C8' },
+  upiTitle: { color: COLORS.textPrimary, fontWeight: '900', fontSize: 14, marginBottom: 9 },
+  upiClaim: { backgroundColor: '#FFF', borderWidth: 1, borderColor: COLORS.border, borderRadius: 10, padding: 10, marginTop: 7, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  upiOrder: { color: COLORS.textPrimary, fontSize: 13, fontWeight: '800' },
+  upiMeta: { color: COLORS.textSecondary, fontSize: 11, marginTop: 3 },
+  rejectForm: { marginTop: 8, gap: 6 },
+  rejectReasonInput: { minWidth: 180, backgroundColor: '#FFF', borderWidth: 1, borderColor: COLORS.border, borderRadius: 7, padding: 8, fontSize: 12, color: COLORS.textPrimary },
+  upiCancelText: { color: COLORS.textSecondary, fontSize: 11, fontWeight: '700', paddingVertical: 3 },
+  upiActions: { gap: 5 },
+  upiAction: { paddingHorizontal: 9, paddingVertical: 7, borderRadius: 7, alignItems: 'center' },
+  upiApprove: { backgroundColor: '#EAF6ED' }, upiApproveText: { color: '#246A3B', fontSize: 11, fontWeight: '800' },
+  upiReject: { backgroundColor: '#FCEBE8' }, upiRejectText: { color: '#97372B', fontSize: 11, fontWeight: '800' },
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
@@ -249,6 +387,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     gap: 6,
   },
+  refreshWarning: { color: COLORS.warning, backgroundColor: COLORS.warningLight, padding: 10, borderRadius: 10, marginBottom: 12, fontSize: 12, fontWeight: '700' },
   filterChip: {
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -314,6 +453,8 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: COLORS.textSecondary,
   },
+  statusBadges: { alignItems: 'flex-end', gap: 5 },
+  orderTime: { color: COLORS.textSecondary, fontSize: 11, marginTop: 5 },
   divider: {
     height: 1,
     backgroundColor: COLORS.border,
@@ -322,11 +463,14 @@ const styles = StyleSheet.create({
   itemsSummary: {
     marginBottom: 10,
   },
+  itemSummaryRow: { marginBottom: 4 },
   itemText: {
     fontSize: 13,
     color: COLORS.textPrimary,
     marginBottom: 2,
   },
+  customizationText: { color: COLORS.textSecondary, fontSize: 11, marginLeft: 18, marginTop: 2 },
+  fulfillmentText: { color: COLORS.textSecondary, fontSize: 12, marginBottom: 8 },
   cardFooter: {
     marginTop: 4,
   },
@@ -336,6 +480,13 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     marginBottom: 10,
   },
+  paymentStatus: {
+    color: COLORS.textSecondary,
+    fontSize: 12,
+    marginTop: 4,
+    marginBottom: 8,
+  },
+  paymentGateNote: { color: COLORS.warning, fontSize: 12, lineHeight: 17, fontWeight: '700', marginBottom: 8 },
   actionsRow: {
     flexDirection: 'row',
     gap: 8,

@@ -23,6 +23,8 @@ export default function AdminSettingsScreen() {
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [feedback, setFeedback] = useState('');
+  const [feedbackError, setFeedbackError] = useState(false);
 
   useEffect(() => {
     fetchSettings();
@@ -47,10 +49,10 @@ export default function AdminSettingsScreen() {
     try {
       setSaving(true);
       await api.put('/settings', settings);
-      Alert.alert('Success', 'Settings updated successfully');
+      setFeedback('Settings saved successfully.'); setFeedbackError(false);
     } catch (e) {
       console.error('[Admin Settings Save Error]:', e);
-      Alert.alert('Error', 'Failed to save settings');
+      setFeedback(e.message || 'Failed to save settings.'); setFeedbackError(true);
     } finally {
       setSaving(false);
     }
@@ -75,7 +77,19 @@ export default function AdminSettingsScreen() {
     <View style={styles.container}>
       <Header title="Restaurant Settings" showBack showCart={false} />
       <ScrollView contentContainerStyle={styles.scrollContent}>
+        {!!feedback && <View style={[styles.feedback, feedbackError && styles.feedbackError]}><Text style={[styles.feedbackText, feedbackError && styles.feedbackErrorText]}>{feedback}</Text></View>}
         
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Customer Payments</Text>
+          <ToggleSwitch label="Cash at counter enabled" value={settings.cashEnabled !== false} onValueChange={val => setSettings({ ...settings, cashEnabled: val })} />
+          <ToggleSwitch label="UPI payment enabled" value={settings.upiEnabled === true} onValueChange={val => setSettings({ ...settings, upiEnabled: val })} />
+          <Text style={styles.inputLabel}>Outlet UPI ID</Text>
+          <TextInput style={styles.input} value={settings.upiId || ''} onChangeText={val => setSettings({ ...settings, upiId: val })} placeholder="outlet@bank" autoCapitalize="none" />
+          <Text style={styles.inputLabel}>Payee name</Text>
+          <TextInput style={styles.input} value={settings.upiPayeeName || ''} onChangeText={val => setSettings({ ...settings, upiPayeeName: val })} placeholder="Wrapchik TIET" />
+          <Text style={styles.paymentHelp}>UPI must be enabled only after entering the official outlet UPI ID and payee name. Wrapchik generates a fresh QR for each order with its server-calculated amount and order reference; a static image is not used. Submitted payment references remain pending until an administrator checks receipt.</Text>
+        </View>
+
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Order Toggles</Text>
           <ToggleSwitch 
@@ -98,6 +112,13 @@ export default function AdminSettingsScreen() {
             value={settings.dineInEnabled} 
             onValueChange={(val) => setSettings({...settings, dineInEnabled: val})} 
           />
+          <ToggleSwitch label="Scheduled pickup enabled" value={settings.scheduledPickupEnabled === true} onValueChange={val => setSettings({ ...settings, scheduledPickupEnabled: val })} />
+          {settings.scheduledPickupEnabled ? <>
+            <Text style={styles.inputLabel}>Pickup slot interval (minutes)</Text>
+            <View style={styles.statusRow}>{[15, 30, 60].map(value => <TouchableOpacity key={value} onPress={() => setSettings({ ...settings, pickupSlotMinutes: value })} style={[styles.statusBtn, Number(settings.pickupSlotMinutes) === value && styles.statusBtnActive]}><Text style={[styles.statusBtnText, Number(settings.pickupSlotMinutes) === value && styles.statusBtnTextActive]}>{value}</Text></TouchableOpacity>)}</View>
+            <Text style={[styles.inputLabel, { marginTop: 14 }]}>Orders per pickup slot</Text>
+            <TextInput style={styles.input} value={String(settings.pickupSlotCapacity ?? 4)} onChangeText={val => setSettings({ ...settings, pickupSlotCapacity: val === '' ? '' : Number(val) })} keyboardType="number-pad" />
+          </> : null}
         </View>
 
         <View style={styles.section}>
@@ -107,7 +128,7 @@ export default function AdminSettingsScreen() {
             style={styles.input}
             value={settings.openTime}
             onChangeText={(val) => setSettings({...settings, openTime: val})}
-            placeholder="e.g. 10:00 AM"
+            placeholder="09:00 (24-hour time)"
           />
           
           <Text style={styles.inputLabel}>Close Time</Text>
@@ -115,14 +136,14 @@ export default function AdminSettingsScreen() {
             style={styles.input}
             value={settings.closeTime}
             onChangeText={(val) => setSettings({...settings, closeTime: val})}
-            placeholder="e.g. 10:00 PM"
+            placeholder="23:00 (24-hour time)"
           />
 
           <Text style={styles.inputLabel}>Est. Prep Minutes</Text>
           <TextInput
             style={styles.input}
             value={settings.estimatedPrepMinutes?.toString()}
-            onChangeText={(val) => setSettings({...settings, estimatedPrepMinutes: parseInt(val) || 0})}
+            onChangeText={(val) => setSettings({...settings, estimatedPrepMinutes: val === '' ? '' : Number(val)})}
             keyboardType="number-pad"
           />
           
@@ -130,8 +151,8 @@ export default function AdminSettingsScreen() {
           <TextInput
             style={styles.input}
             value={settings.deliveryFee?.toString()}
-            onChangeText={(val) => setSettings({...settings, deliveryFee: parseInt(val) || 0})}
-            keyboardType="number-pad"
+            onChangeText={(val) => setSettings({...settings, deliveryFee: val === '' ? '' : Number(val)})}
+            keyboardType="decimal-pad"
           />
         </View>
 
@@ -176,6 +197,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   sectionTitle: { fontSize: 16, fontWeight: '800', color: COLORS.textPrimary, marginBottom: 16 },
+  paymentHelp: { color: COLORS.textSecondary, fontSize: 12, lineHeight: 18, marginTop: -8 },
   
   // Toggle Styles
   toggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
@@ -216,4 +238,5 @@ const styles = StyleSheet.create({
   statusBtnTextActive: { color: '#FFF' },
 
   saveBtn: { marginTop: 10 },
+  feedback: { padding: 11, borderRadius: 8, backgroundColor: '#E6F4E9', marginBottom: 12 }, feedbackError: { backgroundColor: '#FCEBE8' }, feedbackText: { color: '#236C3A', fontSize: 12, fontWeight: '700' }, feedbackErrorText: { color: '#97372B' },
 });

@@ -15,7 +15,7 @@ export default function AdminIssuesScreen() {
     try {
       const res = await api.get('/admin/issues');
       if (res.success) {
-        setIssues(res.data);
+        setIssues(res.issues || []);
       }
     } catch (error) {
       console.error(error);
@@ -75,7 +75,7 @@ export default function AdminIssuesScreen() {
           renderItem={({ item }) => (
             <View style={styles.issueCard}>
               <View style={styles.header}>
-                <Text style={styles.orderNo}>Order #{item.order?.orderNumber || item.orderId}</Text>
+                <Text style={styles.orderNo}>Order #{item.orderId?.orderNumber || item.orderId?._id || item.orderId}</Text>
                 <View style={styles.badge}>
                   <Text style={styles.badgeText}>{item.category}</Text>
                 </View>
