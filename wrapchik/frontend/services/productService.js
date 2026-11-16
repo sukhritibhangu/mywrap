@@ -1,6 +1,7 @@
 import api from './api';
 
 const productService = {
+  getPopularProducts: () => api.get('/products/popular'),
   getProducts: (params = {}) => {
     return api.get('/products', { params });
   },
@@ -17,8 +18,8 @@ const productService = {
     return api.put(`/products/${id}`, productData);
   },
 
-  toggleAvailability: (id) => {
-    return api.patch(`/products/${id}/availability`);
+  toggleAvailability: (id, available) => {
+    return api.patch(`/products/${id}/availability`, { available });
   },
 
   deleteProduct: (id) => {

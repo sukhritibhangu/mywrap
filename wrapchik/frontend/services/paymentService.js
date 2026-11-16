@@ -1,13 +1,8 @@
 import api from './api';
 
 const paymentService = {
-  createRazorpayOrder: (orderId) => {
-    return api.post('/payment/create', { orderId });
-  },
-
-  verifyPayment: (verificationPayload) => {
-    return api.post('/payment/verify', verificationPayload);
-  },
+  getUpiInstructions: (orderId) => api.get(`/payment/upi/${orderId}/instructions`),
+  submitUpiReference: (orderId, transactionReference) => api.post('/payment/upi/submit', { orderId, transactionReference }),
 };
 
 export default paymentService;

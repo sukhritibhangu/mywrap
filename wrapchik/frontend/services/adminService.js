@@ -9,11 +9,13 @@ const adminService = {
     return api.put(`/admin/orders/${id}/status`, { status, rejectionReason });
   },
 
-  getAnalytics: () => {
-    return api.get('/admin/analytics');
-  },
+  confirmCounterPayment: (orderId) => api.post('/payment/counter-confirm', { orderId }),
+  getPendingUpiPayments: () => api.get('/payment/upi/pending'),
+  reviewUpiPayment: (paymentId, action, reason) => api.post(`/payment/upi/${paymentId}/review`, { action, reason }),
 
-  getSettings: () => api.get('/settings'),
+  getAnalytics: (params = {}) => {
+    return api.get('/admin/analytics', { params });
+  },
 
   updateSettings: (data) => {
     return api.put('/settings', data);

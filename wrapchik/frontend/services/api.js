@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
+import { emitAuthExpired } from './authEvents';
 
 // Dynamically determine Backend API base URL
 const getBaseUrl = () => {
@@ -36,10 +37,7 @@ const getBaseUrl = () => {
 
 const getStoredToken = async () => {
   if (Platform.OS !== 'web') {
-    try {
-      const secureToken = await SecureStore.getItemAsync('wrapchik_jwt_token');
-      if (secureToken) return secureToken;
-    } catch (e) {}
+    return SecureStore.getItemAsync('wrapchik_jwt_token');
   }
   return AsyncStorage.getItem('wrapchik_jwt_token');
 };
@@ -87,9 +85,12 @@ api.interceptors.response.use(
 
     if (error.response) {
       if (error.response.status === 401) {
-        try {
-          await clearStoredAuth();
-        } catch (e) {}
+        if (error.config?.headers?.Authorization) {
+          try {
+            await clearStoredAuth();
+            emitAuthExpired();
+          } catch (e) {}
+        }
         customError = error.response.data?.message || 'Session expired. Please log in again.';
       } else if (error.response.data && error.response.data.message) {
         customError = error.response.data.message;
@@ -100,7 +101,12 @@ api.interceptors.response.use(
       }
     }
 
-    return Promise.reject(new Error(customError));
+    const normalizedError = new Error(customError);
+    normalizedError.status = error.response?.status;
+    normalizedError.code = error.code;
+    normalizedError.requiresVerification = error.response?.data?.requiresVerification;
+    normalizedError.phone = error.response?.data?.phone;
+    return Promise.reject(normalizedError);
   }
 );
 
