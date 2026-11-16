@@ -1,6 +1,6 @@
 import React, { useContext } from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
-import { Plus, Minus } from 'lucide-react-native';
+import { Plus, Minus, ShoppingBag } from 'lucide-react-native';
 import { CartContext } from '../../context/CartContext';
 import COLORS from '../../constants/colors';
 
@@ -23,7 +23,7 @@ const ProductCard = ({ product, onPress }) => {
   const handleIncrement = (e) => {
     e?.stopPropagation?.();
     if (existingItem) {
-      updateQuantity(existingItem.cartKey, quantityInCart + 1);
+      if (quantityInCart < 50) updateQuantity(existingItem.cartKey, quantityInCart + 1);
     } else {
       addToCart(product, [], 1);
     }
@@ -41,17 +41,15 @@ const ProductCard = ({ product, onPress }) => {
   };
 
   return (
-    <TouchableOpacity
-      onPress={onPress}
-      activeOpacity={0.8}
-      style={[styles.card, !isAvailable && styles.cardUnavailable]}
-    >
-      <View style={styles.imageContainer}>
-        <Image
-          source={{ uri: product.imageUrl || 'https://via.placeholder.com/150' }}
-          style={styles.image}
-          resizeMode="cover"
-        />
+    <View style={[styles.card, !isAvailable && styles.cardUnavailable]}>
+      <TouchableOpacity
+        onPress={onPress}
+        activeOpacity={0.8}
+        accessibilityRole="button"
+        accessibilityLabel={`View ${product.name} details`}
+        style={styles.imageContainer}
+      >
+        {product.imageUrl ? <Image source={{ uri: product.imageUrl }} style={styles.image} resizeMode="cover" /> : <View style={[styles.image, styles.imageFallback]}><ShoppingBag size={26} color={COLORS.primary} /></View>}
         <View style={[styles.vegBadge, { borderColor: product.isVeg ? COLORS.vegGreen : COLORS.nonVegRed }]}>
           <View style={[styles.vegDot, { backgroundColor: product.isVeg ? COLORS.vegGreen : COLORS.nonVegRed }]} />
         </View>
@@ -61,26 +59,28 @@ const ProductCard = ({ product, onPress }) => {
             <Text style={styles.unavailableText}>Currently Unavailable</Text>
           </View>
         )}
-      </View>
+      </TouchableOpacity>
 
       <View style={styles.content}>
-        <Text style={styles.name} numberOfLines={1}>
-          {product.name}
-        </Text>
-        <Text style={styles.description} numberOfLines={2}>
-          {product.description}
-        </Text>
+        <TouchableOpacity onPress={onPress} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel={`View ${product.name} details`}>
+          <Text style={styles.name} numberOfLines={1}>
+            {product.name}
+          </Text>
+          <Text style={styles.description} numberOfLines={2}>
+            {product.description}
+          </Text>
+        </TouchableOpacity>
 
         <View style={styles.footer}>
           <Text style={styles.price}>₹{product.price}</Text>
 
           {quantityInCart > 0 && isAvailable ? (
             <View style={styles.stepperBox}>
-              <TouchableOpacity onPress={handleDecrement} style={styles.stepperBtn}>
+              <TouchableOpacity onPress={handleDecrement} style={styles.stepperBtn} accessibilityRole="button" accessibilityLabel={`Remove one ${product.name}`}>
                 <Minus size={14} color={COLORS.primary} />
               </TouchableOpacity>
               <Text style={styles.stepperQty}>{quantityInCart}</Text>
-              <TouchableOpacity onPress={handleIncrement} style={styles.stepperBtn}>
+              <TouchableOpacity onPress={handleIncrement} disabled={quantityInCart >= 50} style={styles.stepperBtn} accessibilityRole="button" accessibilityLabel={`Add one ${product.name}`}>
                 <Plus size={14} color={COLORS.primary} />
               </TouchableOpacity>
             </View>
@@ -88,6 +88,8 @@ const ProductCard = ({ product, onPress }) => {
             <TouchableOpacity
               onPress={handleAdd}
               disabled={!isAvailable}
+              accessibilityRole="button"
+              accessibilityLabel={isAvailable ? `Add ${product.name} to cart` : `${product.name} unavailable`}
               style={[styles.addBtn, !isAvailable && styles.addBtnDisabled]}
             >
               <Plus size={16} color={isAvailable ? '#FFFFFF' : '#9E9E9E'} />
@@ -98,17 +100,17 @@ const ProductCard = ({ product, onPress }) => {
           )}
         </View>
       </View>
-    </TouchableOpacity>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    marginBottom: 16,
+    borderRadius: 18,
+    marginBottom: 12,
     flexDirection: 'row',
-    padding: 12,
+    padding: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
@@ -122,9 +124,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#F9FAFB',
   },
   imageContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 12,
+    width: 96,
+    height: 96,
+    borderRadius: 14,
     overflow: 'hidden',
     position: 'relative',
   },
@@ -132,6 +134,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  imageFallback: { alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.surfaceMuted },
   vegBadge: {
     position: 'absolute',
     top: 6,
