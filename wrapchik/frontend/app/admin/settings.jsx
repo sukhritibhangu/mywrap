@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
+import React, { createElement, useContext, useRef, useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, Image, Platform } from 'react-native';
+import { useRouter } from 'expo-router';
+import { AuthContext } from '../../context/AuthContext';
 import Header from '../../components/common/Header';
 import Button from '../../components/common/Button';
 import LoadingIndicator from '../../components/common/LoadingIndicator';
@@ -20,15 +22,49 @@ const ToggleSwitch = ({ value, onValueChange, label }) => (
 );
 
 export default function AdminSettingsScreen() {
+  const router = useRouter();
+  const { user, isLoading: authLoading } = useContext(AuthContext);
+  const qrFileInput = useRef(null);
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [feedbackError, setFeedbackError] = useState(false);
+  const [qrPreviewReady, setQrPreviewReady] = useState(false);
+  const [qrPreviewError, setQrPreviewError] = useState(false);
+  const [readingQr, setReadingQr] = useState(false);
 
   useEffect(() => {
+    if (authLoading) return;
+    if (user?.role !== 'admin') { router.replace('/(auth)/login'); return; }
     fetchSettings();
-  }, []);
+  }, [authLoading, user?.role]);
+
+  const changeQr = (value) => {
+    setQrPreviewReady(false); setQrPreviewError(false);
+    setSettings((current) => ({ ...current, upiQrImageUrl: value }));
+  };
+  const uploadQr = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    setFeedback('');
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 512 * 1024) {
+      setFeedback('Choose a PNG, JPEG or WebP QR image up to 512 KB.'); setFeedbackError(true); return;
+    }
+    setReadingQr(true);
+    try {
+      const value = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error('The image could not be read. Please select it again.'));
+        reader.readAsDataURL(file);
+      });
+      changeQr(String(value));
+      setFeedback('QR selected. Check the preview and recipient, then save settings.'); setFeedbackError(false);
+    } catch (error) { setFeedback(error.message); setFeedbackError(true); }
+    finally { setReadingQr(false); }
+  };
 
   const fetchSettings = async () => {
     try {
@@ -46,6 +82,9 @@ export default function AdminSettingsScreen() {
   };
 
   const handleSave = async () => {
+    if (settings?.upiQrImageUrl && (!qrPreviewReady || qrPreviewError)) {
+      setFeedback('Wait for the QR preview to load, or replace the image before saving.'); setFeedbackError(true); return;
+    }
     try {
       setSaving(true);
       await api.put('/settings', settings);
@@ -58,7 +97,7 @@ export default function AdminSettingsScreen() {
     }
   };
 
-  if (loading) {
+  if (loading || authLoading || user?.role !== 'admin') {
     return <LoadingIndicator message="Loading settings..." />;
   }
 
@@ -87,7 +126,19 @@ export default function AdminSettingsScreen() {
           <TextInput style={styles.input} value={settings.upiId || ''} onChangeText={val => setSettings({ ...settings, upiId: val })} placeholder="outlet@bank" autoCapitalize="none" />
           <Text style={styles.inputLabel}>Payee name</Text>
           <TextInput style={styles.input} value={settings.upiPayeeName || ''} onChangeText={val => setSettings({ ...settings, upiPayeeName: val })} placeholder="Wrapchik TIET" />
-          <Text style={styles.paymentHelp}>UPI must be enabled only after entering the official outlet UPI ID and payee name. Wrapchik generates a fresh QR for each order with its server-calculated amount and order reference; a static image is not used. Submitted payment references remain pending until an administrator checks receipt.</Text>
+          <Text style={styles.inputLabel}>Outlet UPI QR image</Text>
+          {Platform.OS === 'web' ? <>
+            {createElement('input', { ref: qrFileInput, type: 'file', accept: 'image/png,image/jpeg,image/webp', onChange: uploadQr, style: { display: 'none' }, 'aria-label': 'Choose outlet UPI QR image' })}
+            <Button title={readingQr ? 'Reading image…' : 'Upload or replace QR image'} onPress={() => qrFileInput.current?.click()} disabled={saving || readingQr} variant="outline" />
+          </> : null}
+          <Text style={styles.paymentHelp}>Upload a PNG, JPEG or WebP image up to 512 KB, or paste an HTTPS image URL. The uploaded image is saved with your settings and survives server restarts.</Text>
+          <TextInput accessibilityLabel="UPI QR image URL" style={styles.input} value={settings.upiQrImageUrl?.startsWith('data:') ? '' : settings.upiQrImageUrl || ''} onChangeText={changeQr} placeholder={settings.upiQrImageUrl?.startsWith('data:') ? 'An uploaded QR is selected' : 'https://example.com/outlet-qr.png'} autoCapitalize="none" />
+          {settings.upiQrImageUrl ? <View style={styles.qrPreview}>
+            <Image key={settings.upiQrImageUrl} source={{ uri: settings.upiQrImageUrl }} style={{ width: '100%', maxWidth: 280, height: 280 }} resizeMode="contain" accessibilityLabel="Preview of customer payment QR" onLoad={() => { setQrPreviewReady(true); setQrPreviewError(false); }} onError={() => { setQrPreviewReady(false); setQrPreviewError(true); }} />
+            {qrPreviewError ? <Text style={styles.feedbackErrorText}>The QR image could not load. Replace it before saving.</Text> : null}
+            <Button title="Remove preset QR" variant="outline" onPress={() => changeQr('')} disabled={saving} />
+          </View> : null}
+          <Text style={styles.paymentHelp}>Only administrators can change this QR or payment settings. Scan the preview yourself and confirm it belongs to the outlet and matches the UPI ID and payee name above. Customers must enter the exact order total when using a preset QR. If no preset is saved, Wrapchik generates an order-specific QR from the outlet UPI ID. All payments require administrator receipt verification.</Text>
         </View>
 
         <View style={styles.section}>
@@ -211,6 +262,7 @@ const styles = StyleSheet.create({
 
   // Input Styles
   inputLabel: { fontSize: 13, color: COLORS.textSecondary, marginBottom: 6, fontWeight: '600' },
+  qrPreview: { alignItems: 'center', backgroundColor: '#FFFFFF', padding: 14, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, gap: 12, marginBottom: 16 },
   input: {
     backgroundColor: COLORS.inputBackground,
     borderWidth: 1,
