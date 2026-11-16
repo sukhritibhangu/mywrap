@@ -73,11 +73,24 @@ const passwordLoginLimiter = rateLimit({
   message: { success: false, message: 'Too many login attempts. Try again in 15 minutes.' },
 });
 
-router.post('/register', otpSendLimiter, otpAccountLimiter, registerUser);
+const { googleConfig, googleChallenge, googleLogin } = require('../controllers/googleAuthController');
+const googleLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, limit: 30, standardHeaders: true, legacyHeaders: false,
+  message: { success: false, message: 'Too many sign-in attempts. Try again in 15 minutes.' },
+});
+const legacyStudentAuth = (_req, res, next) => {
+  if (process.env.GOOGLE_CLIENT_ID) return res.status(403).json({ success: false, message: 'Continue with your Thapar Google account to sign in or create an account.' });
+  next();
+};
+router.get('/google/config', googleConfig);
+router.post('/google/challenge', googleLimiter, googleChallenge);
+router.post('/google', googleLimiter, googleLogin);
+router.post('/admin/login', passwordLoginLimiter, (req, _res, next) => { req.adminLoginOnly = true; next(); }, loginUser);
+router.post('/register', legacyStudentAuth, otpSendLimiter, otpAccountLimiter, registerUser);
 router.post('/login', passwordLoginLimiter, loginUser);
 
-router.post('/otp/send', otpSendLimiter, otpAccountLimiter, sendOtp);
-router.post('/otp/verify', otpVerifyLimiter, verifyOtp);
+router.post('/otp/send', legacyStudentAuth, otpSendLimiter, otpAccountLimiter, sendOtp);
+router.post('/otp/verify', legacyStudentAuth, otpVerifyLimiter, verifyOtp);
 router.post('/password/reset/otp/send', otpSendLimiter, otpAccountLimiter, sendPasswordResetOtp);
 router.post('/password/reset/otp/verify', otpVerifyLimiter, resetPasswordWithOtp);
 
