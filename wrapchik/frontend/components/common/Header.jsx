@@ -1,21 +1,23 @@
 import React, { useContext } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ShoppingBag, ArrowLeft, Shield } from 'lucide-react-native';
+import { ShoppingBag, ArrowLeft, Shield, Bell } from 'lucide-react-native';
 import { CartContext } from '../../context/CartContext';
 import { AuthContext } from '../../context/AuthContext';
 import COLORS from '../../constants/colors';
+import { NotificationContext } from '../../context/NotificationContext';
 
-const Header = ({ title, showBack = false, showCart = true }) => {
+const Header = ({ title, showBack = false, showCart = true, showNotifications = true }) => {
   const router = useRouter();
   const { cartCount } = useContext(CartContext);
   const { isAdmin } = useContext(AuthContext);
+  const { unreadCount } = useContext(NotificationContext);
 
   return (
     <View style={styles.headerContainer}>
       <View style={styles.leftContainer}>
         {showBack ? (
-          <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel="Go back">
             <ArrowLeft size={24} color={COLORS.textPrimary} />
           </TouchableOpacity>
         ) : (
@@ -34,14 +36,23 @@ const Header = ({ title, showBack = false, showCart = true }) => {
           <TouchableOpacity
             onPress={() => router.push('/admin/dashboard')}
             style={styles.adminBadgeBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Open administrator dashboard"
           >
             <Shield size={16} color="#FFFFFF" />
             <Text style={styles.adminBadgeText}>Admin</Text>
           </TouchableOpacity>
         )}
 
+        {showNotifications && (
+          <TouchableOpacity onPress={() => router.push('/notifications')} style={styles.cartBtn} accessibilityRole="button" accessibilityLabel={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ''}`}>
+            <Bell size={22} color={COLORS.textPrimary} />
+            {unreadCount > 0 && <View style={styles.badge}><Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text></View>}
+          </TouchableOpacity>
+        )}
+
         {showCart && (
-          <TouchableOpacity onPress={() => router.push('/(tabs)/cart')} style={styles.cartBtn}>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/cart')} style={styles.cartBtn} accessibilityRole="button" accessibilityLabel={`Open cart${cartCount > 0 ? `, ${cartCount} items` : ''}`}>
             <ShoppingBag size={24} color={COLORS.textPrimary} />
             {cartCount > 0 && (
               <View style={styles.badge}>
@@ -57,14 +68,16 @@ const Header = ({ title, showBack = false, showCart = true }) => {
 
 const styles = StyleSheet.create({
   headerContainer: {
-    height: 60,
+    minHeight: 64,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     backgroundColor: COLORS.background,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    borderBottomWidth: 0,
+    maxWidth: 1120,
+    width: '100%',
+    alignSelf: 'center',
   },
   leftContainer: {
     flexDirection: 'row',

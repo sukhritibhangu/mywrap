@@ -3,9 +3,9 @@ import { View, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { Search, X } from 'lucide-react-native';
 import COLORS from '../../constants/colors';
 
-const SearchBar = ({ value, onChangeText, onClear, placeholder = 'Search for food, wraps, burgers...' }) => {
+const SearchBar = ({ value, onChangeText, onClear, placeholder = 'Search wraps, burgers and more', style }) => {
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, style]}>
       <Search size={20} color={COLORS.textSecondary} style={styles.icon} />
       <TextInput
         value={value}
@@ -13,9 +13,12 @@ const SearchBar = ({ value, onChangeText, onClear, placeholder = 'Search for foo
         placeholder={placeholder}
         placeholderTextColor={COLORS.textSecondary}
         style={styles.input}
+        accessibilityLabel="Search the menu"
+        accessibilityRole="search"
+        returnKeyType="search"
       />
       {value ? (
-        <TouchableOpacity onPress={onClear} style={styles.clearBtn}>
+        <TouchableOpacity onPress={onClear} style={styles.clearBtn} accessibilityRole="button" accessibilityLabel="Clear search">
           <X size={18} color={COLORS.textSecondary} />
         </TouchableOpacity>
       ) : null}

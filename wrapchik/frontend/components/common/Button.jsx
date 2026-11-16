@@ -1,8 +1,9 @@
 import React from 'react';
 import { TouchableOpacity, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import COLORS from '../../constants/colors';
+import THEME from '../../constants/theme';
 
-const Button = ({ title, onPress, variant = 'primary', loading = false, disabled = false, style, textStyle }) => {
+const Button = ({ title, onPress, variant = 'primary', loading = false, disabled = false, style, textStyle, accessibilityLabel, testID }) => {
   const isPrimary = variant === 'primary';
   const isSecondary = variant === 'secondary';
   const isOutline = variant === 'outline';
@@ -12,6 +13,10 @@ const Button = ({ title, onPress, variant = 'primary', loading = false, disabled
     <TouchableOpacity
       onPress={onPress}
       disabled={disabled || loading}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel || title}
+      accessibilityState={{ disabled: disabled || loading, busy: loading }}
+      testID={testID}
       activeOpacity={0.8}
       style={[
         styles.button,
@@ -46,15 +51,20 @@ const Button = ({ title, onPress, variant = 'primary', loading = false, disabled
 
 const styles = StyleSheet.create({
   button: {
-    height: 50,
-    borderRadius: 12,
+    minHeight: THEME.layout.touchTarget,
+    borderRadius: THEME.radius.md,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 22,
     flexDirection: 'row',
   },
   btnPrimary: {
     backgroundColor: COLORS.primary,
+    shadowColor: COLORS.primaryDark,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.16,
+    shadowRadius: 8,
+    elevation: 2,
   },
   btnSecondary: {
     backgroundColor: COLORS.primaryLight,
@@ -68,11 +78,11 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.danger,
   },
   btnDisabled: {
-    backgroundColor: '#E0E0E0',
-    borderColor: '#E0E0E0',
+    backgroundColor: '#E9E7E4',
+    borderColor: '#E9E7E4',
   },
   text: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
   },
   textPrimary: {

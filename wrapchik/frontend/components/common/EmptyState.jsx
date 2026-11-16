@@ -6,7 +6,7 @@ import Button from './Button';
 
 const EmptyState = ({ title = 'No items found', message = 'Try searching for something else or explore categories.', buttonTitle, onButtonPress }) => {
   return (
-    <View style={styles.container}>
+    <View style={styles.container} accessibilityRole="summary">
       <View style={styles.iconCircle}>
         <UtensilsCrossed size={40} color={COLORS.primary} />
       </View>
@@ -21,14 +21,20 @@ const EmptyState = ({ title = 'No items found', message = 'Try searching for som
 
 const styles = StyleSheet.create({
   container: {
-    padding: 32,
+    marginHorizontal: 16,
+    marginVertical: 16,
+    padding: 28,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: COLORS.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   iconCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     backgroundColor: COLORS.primaryLight,
     justifyContent: 'center',
     alignItems: 'center',
