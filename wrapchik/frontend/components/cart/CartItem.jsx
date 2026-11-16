@@ -1,6 +1,6 @@
 import React, { useContext } from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
-import { Minus, Plus, Trash2 } from 'lucide-react-native';
+import { Minus, Plus, Trash2, ShoppingBag } from 'lucide-react-native';
 import { CartContext } from '../../context/CartContext';
 import COLORS from '../../constants/colors';
 
@@ -11,7 +11,7 @@ const CartItem = ({ item }) => {
 
   return (
     <View style={styles.container}>
-      <Image source={{ uri: item.imageUrl }} style={styles.image} resizeMode="cover" />
+      {item.imageUrl ? <Image source={{ uri: item.imageUrl }} style={styles.image} resizeMode="cover" /> : <View style={[styles.image, styles.imageFallback]}><ShoppingBag size={20} color={COLORS.primary} /></View>}
 
       <View style={styles.details}>
         <Text style={styles.name} numberOfLines={1}>
@@ -28,7 +28,7 @@ const CartItem = ({ item }) => {
       </View>
 
       <View style={styles.actions}>
-        <TouchableOpacity onPress={() => removeFromCart(item.cartKey)} style={styles.deleteBtn}>
+        <TouchableOpacity onPress={() => removeFromCart(item.cartKey)} style={styles.deleteBtn} accessibilityRole="button" accessibilityLabel={`Remove ${item.name}`}>
           <Trash2 size={16} color={COLORS.danger} />
         </TouchableOpacity>
 
@@ -36,6 +36,8 @@ const CartItem = ({ item }) => {
           <TouchableOpacity
             onPress={() => updateQuantity(item.cartKey, item.quantity - 1)}
             style={styles.stepperBtn}
+            accessibilityRole="button"
+            accessibilityLabel={`Remove one ${item.name}`}
           >
             <Minus size={14} color={COLORS.textPrimary} />
           </TouchableOpacity>
@@ -45,6 +47,9 @@ const CartItem = ({ item }) => {
           <TouchableOpacity
             onPress={() => updateQuantity(item.cartKey, item.quantity + 1)}
             style={styles.stepperBtn}
+            disabled={item.quantity >= 50}
+            accessibilityRole="button"
+            accessibilityLabel={`Add one ${item.name}`}
           >
             <Plus size={14} color={COLORS.textPrimary} />
           </TouchableOpacity>
@@ -70,6 +75,7 @@ const styles = StyleSheet.create({
     height: 64,
     borderRadius: 10,
   },
+  imageFallback: { alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.surfaceMuted },
   details: {
     flex: 1,
     marginLeft: 12,
