@@ -24,14 +24,15 @@ const createCategory = async (req, res, next) => {
   try {
     const { name, imageUrl, displayOrder } = req.body;
 
-    if (!name || !imageUrl) {
+    if (typeof name !== 'string' || !name.trim() || typeof imageUrl !== 'string' || !imageUrl.trim()) {
       return res.status(400).json({
         success: false,
         message: 'Category name and image URL are required',
       });
     }
+    if (displayOrder !== undefined && (!Number.isInteger(Number(displayOrder)) || Number(displayOrder) < 0)) return res.status(400).json({ success: false, message: 'Display order must be a non-negative integer' });
 
-    const existingCategory = await Category.findOne({ name });
+    const existingCategory = await Category.findOne({ name: name.trim() });
     if (existingCategory) {
       return res.status(400).json({
         success: false,
@@ -40,9 +41,9 @@ const createCategory = async (req, res, next) => {
     }
 
     const category = await Category.create({
-      name,
-      imageUrl,
-      displayOrder: displayOrder || 0,
+      name: name.trim(),
+      imageUrl: imageUrl.trim(),
+      displayOrder: displayOrder === undefined ? 0 : displayOrder,
     });
 
     res.status(201).json({
@@ -70,9 +71,20 @@ const updateCategory = async (req, res, next) => {
       });
     }
 
-    if (name) category.name = name;
-    if (imageUrl) category.imageUrl = imageUrl;
-    if (displayOrder !== undefined) category.displayOrder = displayOrder;
+    if (name !== undefined) {
+      if (typeof name !== 'string' || !name.trim()) return res.status(400).json({ success: false, message: 'Category name is required' });
+      const duplicate = await Category.exists({ name: name.trim(), _id: { $ne: category._id } });
+      if (duplicate) return res.status(409).json({ success: false, message: 'Category with this name already exists' });
+      category.name = name.trim();
+    }
+    if (imageUrl !== undefined) {
+      if (typeof imageUrl !== 'string' || !imageUrl.trim()) return res.status(400).json({ success: false, message: 'Category image URL is required' });
+      category.imageUrl = imageUrl.trim();
+    }
+    if (displayOrder !== undefined) {
+      if (!Number.isInteger(Number(displayOrder)) || Number(displayOrder) < 0) return res.status(400).json({ success: false, message: 'Display order must be a non-negative integer' });
+      category.displayOrder = Number(displayOrder);
+    }
 
     await category.save();
 

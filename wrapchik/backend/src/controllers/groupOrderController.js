@@ -1,9 +1,14 @@
 const GroupOrder = require('../models/GroupOrder');
 const crypto = require('crypto');
+const mongoose = require('mongoose');
 
 const createGroup = async (req, res, next) => {
   try {
-    const { orderType, hostel, roomNumber, tableId, maxMembers } = req.body;
+    const { orderType = 'TAKEAWAY', hostel, roomNumber, tableId, maxMembers = 8 } = req.body || {};
+    if (!['TAKEAWAY', 'DELIVERY', 'DINE_IN'].includes(orderType)) return res.status(400).json({ success: false, message: 'Invalid group order type.' });
+    if (!Number.isInteger(Number(maxMembers)) || Number(maxMembers) < 2 || Number(maxMembers) > 8) return res.status(400).json({ success: false, message: 'Group size must be from 2 to 8 members.' });
+    if (orderType === 'DELIVERY' && (typeof hostel !== 'string' || !hostel.trim() || hostel.trim().length > 120 || typeof roomNumber !== 'string' || !roomNumber.trim() || roomNumber.trim().length > 32)) return res.status(400).json({ success: false, message: 'A valid hostel and room are required for a delivery group.' });
+    if (orderType === 'DINE_IN' && !mongoose.isValidObjectId(tableId)) return res.status(400).json({ success: false, message: 'A valid table is required for a dine-in group.' });
     const groupCode = crypto.randomBytes(3).toString('hex').toUpperCase();
 
     const group = await GroupOrder.create({
@@ -14,7 +19,7 @@ const createGroup = async (req, res, next) => {
       hostel,
       roomNumber,
       tableId,
-      maxMembers: maxMembers || 8,
+      maxMembers: Number(maxMembers),
     });
 
     res.status(201).json({ success: true, group });
@@ -23,8 +28,9 @@ const createGroup = async (req, res, next) => {
 
 const joinGroup = async (req, res, next) => {
   try {
-    const { groupCode } = req.body;
-    const group = await GroupOrder.findOne({ groupCode: groupCode.toUpperCase() });
+    const groupCode = req.body?.groupCode;
+    if (typeof groupCode !== 'string' || !/^[A-F0-9]{6}$/.test(groupCode.trim().toUpperCase())) return res.status(400).json({ success: false, message: 'Enter a valid six-character group code.' });
+    const group = await GroupOrder.findOne({ groupCode: groupCode.trim().toUpperCase() });
     
     if (!group) return res.status(404).json({ success: false, message: 'Group not found' });
     if (group.status !== 'OPEN') return res.status(400).json({ success: false, message: 'Group is no longer open' });
@@ -52,8 +58,10 @@ const joinGroup = async (req, res, next) => {
 
 const getGroupDetails = async (req, res, next) => {
   try {
-    const group = await GroupOrder.findById(req.params.id).populate('members.userId', 'name email');
+    const group = await GroupOrder.findById(req.params.id).populate('members.userId', 'name');
     if (!group) return res.status(404).json({ success: false, message: 'Group not found' });
+    const isJoinedMember = group.members.some(member => member.status === 'JOINED' && String(member.userId?._id || member.userId) === String(req.user._id));
+    if (!isJoinedMember) return res.status(403).json({ success: false, message: 'Only current group members can view group details.' });
     res.json({ success: true, group });
   } catch (error) { next(error); }
 };
@@ -62,9 +70,11 @@ const lockGroup = async (req, res, next) => {
   try {
     const group = await GroupOrder.findById(req.params.id);
     if (!group) return res.status(404).json({ success: false, message: 'Group not found' });
-    if (group.leaderId.toString() !== req.user._id.toString()) {
+    const leaderIsJoined = group.members.some(member => member.status === 'JOINED' && member.userId.toString() === req.user._id.toString());
+    if (group.leaderId.toString() !== req.user._id.toString() || !leaderIsJoined) {
       return res.status(403).json({ success: false, message: 'Only leader can lock the group' });
     }
+    if (group.status !== 'OPEN') return res.status(409).json({ success: false, message: 'Only an open group can be locked.' });
     
     group.status = 'LOCKED';
     await group.save();
