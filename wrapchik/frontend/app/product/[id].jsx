@@ -1,30 +1,17 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useCallback } from 'react';
 import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Heart, Minus, Plus, ArrowLeft, Check } from 'lucide-react-native';
+import { Heart, Minus, Plus, Check, ShoppingBag } from 'lucide-react-native';
 import { CartContext } from '../../context/CartContext';
 import { AuthContext } from '../../context/AuthContext';
 import Header from '../../components/common/Header';
 import Button from '../../components/common/Button';
 import LoadingIndicator from '../../components/common/LoadingIndicator';
+import ErrorState from '../../components/common/ErrorState';
 import productService from '../../services/productService';
 import favouriteService from '../../services/favouriteService';
 import COLORS from '../../constants/colors';
-
-const FALLBACK_PRODUCT_DETAILS = {
-  _id: 'p1',
-  name: 'Paneer Tikka Wrap',
-  description: 'Grilled paneer cubes marinated in rich tandoori spices with fresh crunchy veggies wrapped in warm tortilla.',
-  price: 120,
-  imageUrl: 'https://images.unsplash.com/photo-1626700051175-6818013e1d4f?w=600',
-  isVeg: true,
-  available: true,
-  customizations: [
-    { name: 'Extra Cheese', price: 20 },
-    { name: 'Extra Mint Mayo', price: 10 },
-    { name: 'Double Paneer', price: 40 },
-  ],
-};
+import THEME from '../../constants/theme';
 
 export default function ProductDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -35,6 +22,8 @@ export default function ProductDetailScreen() {
 
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [favouriteBusy, setFavouriteBusy] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [selectedCustomizations, setSelectedCustomizations] = useState([]);
   const [isFavourite, setIsFavourite] = useState(false);
@@ -50,46 +39,53 @@ export default function ProductDetailScreen() {
     try {
       const res = await favouriteService.getFavourites();
       if (res.success) {
-        const isFav = res.data.some(fav => fav._id === id);
+        const isFav = (res.favourites || []).some(fav => fav._id === id);
         setIsFavourite(isFav);
       }
     } catch (e) {
-      console.error('Error fetching favourites', e);
+      console.warn('Error fetching favourites', e);
     }
   };
 
-  const fetchProduct = async () => {
+  const fetchProduct = useCallback(async () => {
     try {
       setLoading(true);
       const res = await productService.getProductById(id);
       if (res.success && res.product) {
         setProduct(res.product);
-      } else {
-        setProduct(FALLBACK_PRODUCT_DETAILS);
-      }
+        setLoadError(false);
+      } else throw new Error('Product was not found.');
     } catch (e) {
-      setProduct(FALLBACK_PRODUCT_DETAILS);
+      console.warn('[ProductDetail Load Error]:', e);
+      setProduct(null);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
   const toggleFavouriteAPI = async () => {
     if (!user) {
-      Alert.alert('Login Required', 'Please login to save favourites');
+      router.push('/(auth)/login');
       return;
     }
+    if (favouriteBusy) return;
+    setFavouriteBusy(true);
     const prev = isFavourite;
     setIsFavourite(!prev); // Optimistic update
     try {
       if (prev) {
-        await favouriteService.removeFavourite(id);
+        const response = await favouriteService.removeFavourite(id);
+        if (!response?.success) throw new Error(response?.message || 'Favourite could not be removed.');
       } else {
-        await favouriteService.addFavourite(id);
+        const response = await favouriteService.addFavourite(id);
+        if (!response?.success) throw new Error(response?.message || 'Favourite could not be saved.');
       }
     } catch (error) {
       setIsFavourite(prev); // Revert on failure
-      Alert.alert('Error', 'Failed to update favourite status');
+      Alert.alert('Could not update favourite', error?.message || 'Please try again.');
+    } finally {
+      setFavouriteBusy(false);
     }
   };
 
@@ -101,9 +97,8 @@ export default function ProductDetailScreen() {
     }
   };
 
-  if (loading || !product) {
-    return <LoadingIndicator message="Loading product details..." />;
-  }
+  if (loading) return <View style={styles.container}><Header title="Menu item" showBack showCart={false} /><LoadingIndicator message="Loading product details…" /></View>;
+  if (loadError || !product) return <View style={styles.container}><Header title="Menu item" showBack showCart={false} /><ErrorState title="We couldn’t load this item" message="It may have been removed or the menu service is unavailable." onRetry={fetchProduct} /></View>;
 
   const custSubtotal = selectedCustomizations.reduce((sum, c) => sum + c.price, 0);
   const unitPrice = product.price + custSubtotal;
@@ -134,11 +129,14 @@ export default function ProductDetailScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Hero Image & Overlay */}
         <View style={styles.heroBox}>
-          <Image source={{ uri: product.imageUrl }} style={styles.heroImage} resizeMode="cover" />
+          {product.imageUrl ? <Image source={{ uri: product.imageUrl }} style={styles.heroImage} resizeMode="cover" /> : <View style={[styles.heroImage, styles.imageFallback]}><ShoppingBag size={40} color={COLORS.primary} /></View>}
 
           <TouchableOpacity
             onPress={toggleFavouriteAPI}
             style={styles.favBtn}
+            disabled={favouriteBusy}
+            accessibilityRole="button"
+            accessibilityLabel={isFavourite ? 'Remove from favourites' : 'Save to favourites'}
           >
             <Heart size={20} color={isFavourite ? COLORS.danger : COLORS.textSecondary} fill={isFavourite ? COLORS.danger : 'transparent'} />
           </TouchableOpacity>
@@ -159,7 +157,7 @@ export default function ProductDetailScreen() {
             </View>
           </View>
 
-          <Text style={styles.price}>₹{product.price}</Text>
+          <View style={styles.priceRow}><Text style={styles.price}>₹{product.price}</Text><Text style={styles.priceUnit}> / item</Text></View>
           <Text style={styles.description}>{product.description}</Text>
         </View>
 
@@ -176,6 +174,9 @@ export default function ProductDetailScreen() {
                   onPress={() => toggleCustomization(cust)}
                   activeOpacity={0.8}
                   style={[styles.custCard, isSelected && styles.custCardSelected]}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: isSelected }}
+                  accessibilityLabel={`${cust.name}, additional ₹${cust.price}`}
                 >
                   <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
                     {isSelected && <Check size={14} color="#FFFFFF" />}
@@ -205,6 +206,9 @@ export default function ProductDetailScreen() {
             <TouchableOpacity
               onPress={() => setQuantity(quantity + 1)}
               style={styles.stepperBtn}
+              disabled={quantity >= 50}
+              accessibilityRole="button"
+              accessibilityLabel="Add one"
             >
               <Plus size={18} color={COLORS.textPrimary} />
             </TouchableOpacity>
@@ -232,23 +236,28 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 20,
+    maxWidth: 900,
+    width: '100%',
+    alignSelf: 'center',
   },
   heroBox: {
     width: '100%',
     height: 240,
     position: 'relative',
+    alignSelf: 'center',
   },
   heroImage: {
     width: '100%',
     height: '100%',
   },
+  imageFallback: { alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.surfaceMuted },
   favBtn: {
     position: 'absolute',
     top: 16,
     right: 16,
     backgroundColor: '#FFFFFF',
-    width: 40,
-    height: 40,
+    width: 46,
+    height: 46,
     borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
@@ -270,9 +279,9 @@ const styles = StyleSheet.create({
   },
   detailsBox: {
     backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    padding: 20,
+    borderBottomLeftRadius: 22,
+    borderBottomRightRadius: 22,
   },
   titleRow: {
     flexDirection: 'row',
@@ -304,6 +313,8 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     marginTop: 6,
   },
+  priceRow: { flexDirection: 'row', alignItems: 'baseline', marginTop: 6 },
+  priceUnit: { fontSize: 12, color: COLORS.textSecondary },
   description: {
     fontSize: 14,
     color: COLORS.textSecondary,
@@ -311,7 +322,12 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   custSection: {
+    margin: 16,
     padding: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   custTitle: {
     fontSize: 16,
@@ -398,6 +414,10 @@ const styles = StyleSheet.create({
   footer: {
     backgroundColor: '#FFFFFF',
     padding: 16,
+    paddingHorizontal: THEME.layout.pageGutter,
+    maxWidth: THEME.layout.pageMaxWidth,
+    width: '100%',
+    alignSelf: 'center',
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
   },
