@@ -1,4 +1,5 @@
 const test = require('node:test');
+delete process.env.GOOGLE_CLIENT_ID;
 const assert = require('node:assert/strict');
 const express = require('express');
 const User = require('../src/models/User');

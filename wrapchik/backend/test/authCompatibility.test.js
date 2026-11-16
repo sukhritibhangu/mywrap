@@ -1,4 +1,6 @@
 const test = require('node:test');
+// This suite covers legacy behavior before Google student sign-in is configured.
+delete process.env.GOOGLE_CLIENT_ID;
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
