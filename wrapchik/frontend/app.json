@@ -31,16 +31,30 @@
         {
           "image": "./assets/splash.png",
           "resizeMode": "contain",
-          "backgroundColor": "#FFFFFF"
+          "backgroundColor": "#FFF8F3"
+        }
+      ],
+      "expo-dev-client",
+      [
+        "expo-secure-store",
+        {
+          "configureAndroidBackup": true
         }
       ],
       [
         "expo-notifications",
         {
-          "color": "#FF5722"
+          "color": "#FF5722",
+          "defaultChannel": "orders"
         }
       ]
     ],
-    "scheme": "wrapchik"
+    "scheme": "wrapchik",
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "4a057aed-99c4-439e-bd49-b465197abaf7"
+      }
+    }
   }
 }

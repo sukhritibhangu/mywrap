@@ -1,0 +1,29 @@
+# Expo dependency and Metro caches
+node_modules/
+.git
+.expo/
+metro-cache/
+node-compile-cache/
+metro-file-map-*
+
+# Generated exports and temporary verification files
+dist/
+web-build/
+coverage/
+artifacts/
+.phase*/
+.eas-inspect*/
+.android-keyboard-check*/
+*.log
+*.tmp
+
+# Keep secrets out of EAS archives, but retain the safe example file
+.env
+.env.*
+!.env.example
+
+# Preserve android/ source needed by native builds; exclude only Gradle outputs
+android/.gradle/
+android/.cxx/
+android/build/
+android/app/build/
