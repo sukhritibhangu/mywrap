@@ -18,14 +18,24 @@ const paymentSchema = new mongoose.Schema(
       unique: true,
       index: true,
     },
+    gateway: { type: String, enum: ['CASHFREE', 'UPI_QR', 'COUNTER', 'RAZORPAY', null], default: null },
     gatewayPaymentId: {
       type: String,
       default: null,
+    },
+    gatewayPaymentIds: {
+      type: [String],
+      default: [],
     },
     gatewaySignature: {
       type: String,
       default: null,
     },
+    paymentSessionId: { type: String, default: null, select: false },
+    upiTransactionReference: { type: String, default: null, maxlength: 120 },
+    verificationReason: { type: String, default: null, maxlength: 500 },
+    verifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    verifiedAt: { type: Date, default: null },
     amount: {
       type: Number,
       required: true,

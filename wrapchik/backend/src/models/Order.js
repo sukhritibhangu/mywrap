@@ -37,6 +37,11 @@ const orderSchema = new mongoose.Schema(
       ref: 'User',
       required: true,
     },
+    customerSnapshot: {
+      name: { type: String, default: '' },
+      email: { type: String, default: '' },
+      phone: { type: String, default: '' },
+    },
     orderNumber: {
       type: String,
       required: true,
@@ -55,6 +60,11 @@ const orderSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+    paymentMethod: {
+      type: String,
+      enum: ['COUNTER', 'UPI_QR', 'CASHFREE', 'RAZORPAY'],
+      default: 'COUNTER',
+    },
     pickupLocation: {
       type: String,
       default: 'Wrapchik Campus Counter, Student Activity Center',
@@ -63,10 +73,17 @@ const orderSchema = new mongoose.Schema(
       type: String,
       default: 'Immediate (15-20 mins)',
     },
+    scheduledPickupAt: { type: Date, default: null },
+    pickupSlotId: { type: mongoose.Schema.Types.ObjectId, ref: 'PickupSlot', default: null },
+    couponId: { type: mongoose.Schema.Types.ObjectId, ref: 'Coupon', default: null },
+    couponCode: { type: String, default: null },
+    discountAmount: { type: Number, default: 0, min: 0 },
     paymentId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Payment',
     },
+    paymentCreateLockToken: { type: String, select: false },
+    paymentCreateLockUntil: { type: Date, select: false },
     paymentStatus: {
       type: String,
       enum: ['PENDING', 'SUCCESS', 'FAILED', 'CANCELLED'],
@@ -88,6 +105,15 @@ const orderSchema = new mongoose.Schema(
       ],
       default: 'PLACED',
     },
+    acceptedAt: { type: Date, default: null },
+    preparingAt: { type: Date, default: null },
+    readyAt: { type: Date, default: null },
+    pickedUpAt: { type: Date, default: null },
+    deliveredAt: { type: Date, default: null },
+    servedAt: { type: Date, default: null },
+    completedAt: { type: Date, default: null },
+    rejectedAt: { type: Date, default: null },
+    cancelledAt: { type: Date, default: null },
     rejectionReason: {
       type: String,
       default: null,
@@ -102,11 +128,21 @@ const orderSchema = new mongoose.Schema(
     estimatedDeliveryTime: { type: Date, default: null },
     courierId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     groupOrderId: { type: mongoose.Schema.Types.ObjectId, ref: 'GroupOrder', default: null },
-    idempotencyKey: { type: String, default: null, index: { unique: true, sparse: true } },
+    // Enforce uniqueness for real keys while excluding legacy null/missing values.
+    idempotencyKey: {
+      type: String,
+      index: {
+        name: 'idempotencyKey_uniqueStrings',
+        unique: true,
+        partialFilterExpression: { idempotencyKey: { $type: 'string' } },
+      },
+    },
   },
   {
     timestamps: true,
   }
 );
+
+orderSchema.index({ paymentStatus: 1, orderStatus: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Order', orderSchema);

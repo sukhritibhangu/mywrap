@@ -17,6 +17,13 @@ const userSchema = new mongoose.Schema(
       trim: true,
     },
 
+    // Existing users remain authorized through legacy phoneVerified records;
+    // newly registered accounts must prove email ownership before sign-in.
+    emailVerified: {
+      type: Boolean,
+      default: false,
+    },
+
     phone: {
       type: String,
       required: true,
