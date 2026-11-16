@@ -21,6 +21,9 @@ const COLORS = {
   textSecondary: '#6B7280', // Subtitle Muted Gray Text
   border: '#E5E7EB',        // Light Divider Border
   inputBackground: '#F9FAFB',
+  surfaceMuted: '#F4F1EC',
+  textInverse: '#FFFFFF',
+  overlay: 'rgba(31, 41, 55, 0.48)',
 
   // Food Indicators
   vegGreen: '#2E7D32',
