@@ -56,7 +56,7 @@ function GoogleButton({ onCredential, onError }) {
   }, []);
   if (Platform.OS !== 'web') return <Button title="Open Wrapchik web sign-in" onPress={() => Linking.openURL('https://wrapchik.onrender.com/login')} />;
   return <View style={styles.googleButton}>
-    {loading ? <ActivityIndicator color={COLORS.primary} accessibilityLabel="Loading Google sign-in" /> : null}
+    {loading ? <View style={{ alignItems: 'center', gap: 10 }}><ActivityIndicator color={COLORS.primary} accessibilityLabel="Loading Google sign-in" /><Text style={styles.domain}>Connecting to sign-in… This may take a minute.</Text></View> : null}
     {unavailable ? <Text style={styles.info}>Google sign-in will be available soon. Please try again later.</Text> : null}
     {createElement('div', { ref: element, style: { minHeight: loading || unavailable ? 0 : 44, maxWidth: '100%' } })}
   </View>;
