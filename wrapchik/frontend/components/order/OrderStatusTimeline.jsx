@@ -28,12 +28,24 @@ const DINE_IN_STEPS = [
   { status: 'COMPLETED', title: 'Order Completed', desc: 'Enjoy your fresh meal!', Icon: CheckCircle2 },
 ];
 
-const OrderStatusTimeline = ({ currentStatus, orderType = 'TAKEAWAY' }) => {
+const STEP_TIMESTAMP_FIELDS = {
+  ACCEPTED: 'acceptedAt',
+  PREPARING: 'preparingAt',
+  READY: 'readyAt',
+  PICKED_UP: 'pickedUpAt',
+  DELIVERED: 'deliveredAt',
+  SERVED: 'servedAt',
+  COMPLETED: 'completedAt',
+};
+const formatStepTime = (value) => value ? new Date(value).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : null;
+
+const OrderStatusTimeline = ({ currentStatus, orderType = 'TAKEAWAY', order }) => {
   if (currentStatus === 'REJECTED' || currentStatus === 'CANCELLED') {
     return (
       <View style={styles.cancelledBox}>
         <Text style={styles.cancelledTitle}>Order {currentStatus}</Text>
-        <Text style={styles.cancelledDesc}>This order was {currentStatus.toLowerCase()}. Contact support if you require assistance.</Text>
+        <Text style={styles.cancelledDesc}>{currentStatus === 'REJECTED' && order?.rejectionReason ? `Reason: ${order.rejectionReason}` : `This order was ${currentStatus.toLowerCase()}. Contact support if you require assistance.`}</Text>
+        {formatStepTime(currentStatus === 'REJECTED' ? order?.rejectedAt : order?.cancelledAt) ? <Text style={styles.stepTime}>{formatStepTime(currentStatus === 'REJECTED' ? order?.rejectedAt : order?.cancelledAt)}</Text> : null}
       </View>
     );
   }
@@ -54,6 +66,7 @@ const OrderStatusTimeline = ({ currentStatus, orderType = 'TAKEAWAY' }) => {
         const isPassed = index <= currentIndex;
         const isCurrent = index === currentIndex;
         const IconComponent = step.Icon;
+        const stepTime = formatStepTime(index === 0 ? order?.createdAt : order?.[STEP_TIMESTAMP_FIELDS[step.status]]);
 
         return (
           <View key={step.status} style={styles.stepRow}>
@@ -91,6 +104,7 @@ const OrderStatusTimeline = ({ currentStatus, orderType = 'TAKEAWAY' }) => {
                 {step.title}
               </Text>
               <Text style={styles.desc}>{step.desc}</Text>
+              {isPassed && stepTime ? <Text style={styles.stepTime}>{stepTime}</Text> : null}
             </View>
           </View>
         );
@@ -160,6 +174,7 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     marginTop: 2,
   },
+  stepTime: { fontSize: 11, color: COLORS.textSecondary, marginTop: 3 },
   cancelledBox: {
     padding: 16,
     backgroundColor: COLORS.dangerLight,

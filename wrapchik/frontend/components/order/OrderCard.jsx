@@ -18,6 +18,8 @@ const OrderCard = ({ order }) => {
     <TouchableOpacity
       onPress={() => router.push(`/order-tracking/${order._id}`)}
       activeOpacity={0.8}
+      accessibilityRole="button"
+      accessibilityLabel={`Order ${order.orderNumber}, ${String(order.orderStatus || 'unknown').toLowerCase()}, total ₹${order.totalAmount}. Open details`}
       style={styles.card}
     >
       <View style={styles.header}>
@@ -25,17 +27,18 @@ const OrderCard = ({ order }) => {
           <Text style={styles.orderNumber}>Order #{order.orderNumber}</Text>
           <Text style={styles.date}>{formattedDate}</Text>
         </View>
-        <StatusBadge status={order.orderStatus} />
+          <View style={styles.badges}><StatusBadge status={order.orderStatus} /><StatusBadge status={order.paymentStatus} /></View>
       </View>
 
       <View style={styles.divider} />
 
       <View style={styles.itemsSummary}>
-        {order.items.map((item, idx) => (
+        {(order.items || []).slice(0, 3).map((item, idx) => (
           <Text key={idx} style={styles.itemText} numberOfLines={1}>
             {item.quantity} × {item.name}
           </Text>
         ))}
+        {(order.items || []).length > 3 ? <Text style={styles.moreItems}>+{order.items.length - 3} more items</Text> : null}
       </View>
 
       <View style={styles.footer}>
@@ -65,6 +68,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
   },
+  badges: { alignItems: 'flex-end', gap: 5 },
   orderNumber: {
     fontSize: 16,
     fontWeight: '800',
@@ -88,6 +92,7 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     marginBottom: 2,
   },
+  moreItems: { fontSize: 11, color: COLORS.textSecondary, marginTop: 2 },
   footer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
