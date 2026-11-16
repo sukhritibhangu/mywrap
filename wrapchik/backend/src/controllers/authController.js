@@ -145,6 +145,10 @@ const loginUser = async (req, res, next) => {
       return res.status(401).json({ success: false, message: 'Invalid email or password' });
     }
 
+    if ((req.adminLoginOnly || process.env.GOOGLE_CLIENT_ID) && user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Students must continue with their Thapar Google account.' });
+    }
+
     return res.json({ success: true, token: generateToken(user._id), user: authUserPayload(user) });
   } catch (error) {
     next(error);
