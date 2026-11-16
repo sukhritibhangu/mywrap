@@ -46,7 +46,8 @@ const restaurantSettingsSchema = new mongoose.Schema(
     },
     upiId: { type: String, default: '', trim: true, maxlength: 120 },
     upiPayeeName: { type: String, default: '', trim: true, maxlength: 120 },
-    upiQrImageUrl: { type: String, default: '', trim: true, maxlength: 1000 },
+    // Admin-uploaded QR is stored in MongoDB so it survives Render restarts.
+    upiQrImageUrl: { type: String, default: '', trim: true, maxlength: 700000 },
     upiEnabled: { type: Boolean, default: false },
     cashEnabled: { type: Boolean, default: true },
   },
