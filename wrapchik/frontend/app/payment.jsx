@@ -1,5 +1,5 @@
 import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, Linking, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, Linking, Platform, ActivityIndicator, Image } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import QRCode from 'react-native-qrcode-svg';
 import { AuthContext } from '../context/AuthContext';
@@ -26,7 +26,10 @@ export default function PaymentScreen() {
   const [message, setMessage] = useState('');
   const [isError, setIsError] = useState(false);
   const [upiAppUnavailable, setUpiAppUnavailable] = useState(false);
+  const [qrImageError, setQrImageError] = useState(false);
   const autoLaunchAttemptedUri = useRef('');
+
+  useEffect(() => { setQrImageError(false); }, [instructions?.qrImageUrl]);
 
   const refresh = useCallback(async (showFeedback = false) => {
     if (!orderId) { setLoading(false); return; }
@@ -105,14 +108,18 @@ export default function PaymentScreen() {
         <Text style={styles.amount}>₹{Number(instructions?.amount ?? order.totalAmount).toFixed(2)}</Text>
         <Text style={styles.orderText}>Order #{order.orderNumber}</Text>
       </View>
-      {instructions?.upiUri ? <View style={styles.qrCard}><QRCode value={instructions.upiUri} size={220} backgroundColor="#FFFFFF" color="#1E2633" /><Text style={styles.qrHint}>Scan with Google Pay, PhonePe, Paytm, BHIM, or another UPI app.</Text></View> : <Text style={styles.error}>UPI payment is not currently available. Contact the outlet or choose another method for a new order.</Text>}
+      {instructions?.qrImageUrl ? <View style={styles.qrCard}>
+        <Text style={styles.detailValue}>Outlet UPI QR</Text>
+        {qrImageError ? <Text accessibilityRole="alert" style={styles.error}>The outlet QR could not load. Do not pay using another QR; contact the outlet.</Text> : <Image source={{ uri: instructions.qrImageUrl }} style={{ width: '100%', maxWidth: 300, height: 300, marginTop: 12 }} resizeMode="contain" accessibilityLabel="UPI QR provided by the outlet administrator" onError={() => setQrImageError(true)} />}
+        <Text style={styles.qrHint}>Scan this QR using a UPI app. Enter exactly ₹{Number(instructions.amount).toFixed(2)} and verify the recipient name in your UPI app before paying.</Text>
+      </View> : instructions?.upiUri ? <View style={styles.qrCard}><QRCode value={instructions.upiUri} size={220} backgroundColor="#FFFFFF" color="#1E2633" /><Text style={styles.qrHint}>Scan with Google Pay, PhonePe, Paytm, BHIM, or another UPI app.</Text></View> : <Text style={styles.error}>UPI payment is not currently available. Contact the outlet or choose another method for a new order.</Text>}
       {upiAppUnavailable ? <Text style={styles.fallbackHint}>No compatible UPI app was found. Use the QR code above with a UPI app on another device.</Text> : null}
       {instructions ? <View style={styles.detailsCard}>
         <Text style={styles.detailLabel}>PAYEE</Text><Text style={styles.detailValue}>{instructions.payeeName}</Text>
         <Text style={styles.detailLabel}>UPI ID</Text><Text style={styles.detailValue}>{instructions.upiId}</Text>
         <Text style={styles.detailLabel}>ORDER REFERENCE</Text><Text style={styles.detailValue}>{instructions.orderNumber}</Text>
       </View> : null}
-      <Button title="Pay using UPI App" onPress={openUpiApp} disabled={!instructions?.upiUri} />
+      {instructions?.upiUri ? <Button title="Pay using UPI App" onPress={openUpiApp} /> : null}
       <Text style={styles.instruction}>After paying, return here and submit the UPI transaction reference. The outlet will check its receipt records and confirm the payment manually. Opening an app or submitting a reference never marks an order as paid.</Text>
       {submittedReference && order.paymentStatus === 'PENDING' ? <View style={styles.pendingBox}><Text style={styles.pendingText}>Reference {submittedReference} is awaiting outlet verification.</Text></View> : null}
       {rejectedReason ? <View style={styles.rejectedBox}><Text style={styles.rejectedTitle}>Payment claim rejected</Text><Text style={styles.instruction}>{rejectedReason}</Text></View> : null}

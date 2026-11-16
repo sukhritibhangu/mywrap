@@ -495,12 +495,12 @@ export default function CheckoutScreen() {
                     accessibilityState={{ selected: paymentMethod === 'UPI_QR' }}
                   >
                     <CreditCard size={24} color={paymentMethod === 'UPI_QR' ? COLORS.primary : COLORS.textSecondary} />
-                    <Text style={[styles.paymentText, paymentMethod === 'UPI_QR' && styles.paymentTextSelected]}>UPI QR</Text>
+                    <Text style={[styles.paymentText, paymentMethod === 'UPI_QR' && styles.paymentTextSelected]}>Pay via UPI</Text>
                   </TouchableOpacity> : null}
                 </View>
                 {settings?.cashEnabled === false && settings?.upiEnabled !== true ? <Text style={styles.pricingNote}>The outlet has not enabled a payment method yet. Please try again later.</Text> : null}
                 {paymentMethod === 'COUNTER' && settings?.cashEnabled !== false ? <Text style={styles.pricingNote}>Pay cash at the Wrapchik counter when you collect your order.</Text> : null}
-                {paymentMethod === 'UPI_QR' ? <Text style={styles.pricingNote}>Scan the order QR or open a compatible UPI app. The outlet verifies payment manually.</Text> : null}
+                {paymentMethod === 'UPI_QR' ? <Text style={styles.pricingNote}>After placing your order, scan the outlet QR and pay the exact total shown. Payment stays pending until the admin verifies receipt.</Text> : null}
                 {submissionError ? <View style={styles.validationBanner} accessibilityRole="alert"><Text style={styles.validationText}>{submissionError}</Text></View> : null}
               </View>
             )}
