@@ -1,14 +1,21 @@
-import React, { useContext } from 'react';
+import React, { useContext, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
-import { User, Heart, Clock, Shield, HelpCircle, Info, LogOut, ChevronRight } from 'lucide-react-native';
+import { Heart, Clock, Shield, HelpCircle, Info, LogIn, LogOut, ChevronRight, Bell } from 'lucide-react-native';
 import { AuthContext } from '../../context/AuthContext';
 import Header from '../../components/common/Header';
 import COLORS from '../../constants/colors';
+import Input from '../../components/common/Input';
+import Button from '../../components/common/Button';
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { user, isAdmin, logout } = useContext(AuthContext);
+  const { user, isAdmin, logout, updateProfile } = useContext(AuthContext);
+  const [editingName, setEditingName] = useState(false);
+  const [name, setName] = useState(user?.name || '');
+  const [saving, setSaving] = useState(false);
+  const [profileError, setProfileError] = useState('');
+  const [profileNotice, setProfileNotice] = useState('');
 
   const handleLogout = async () => {
     try {
@@ -16,7 +23,27 @@ export default function ProfileScreen() {
       router.replace('/(auth)/login');
     } catch (e) {
       console.error('[Logout Error]:', e);
+      Alert.alert('Could not log out', e?.message || 'Please try again.');
     }
+  };
+
+  const handleSaveName = async () => {
+    const cleanName = name.trim();
+    if (!cleanName || cleanName.length > 80) {
+      setProfileError('Name must be between 1 and 80 characters.');
+      return;
+    }
+    setSaving(true);
+    setProfileError('');
+    setProfileNotice('');
+    const result = await updateProfile({ name: cleanName });
+    setSaving(false);
+    if (!result?.success) {
+      setProfileError(result?.message || 'Could not update your profile.');
+      return;
+    }
+    setEditingName(false);
+    setProfileNotice('Name updated.');
   };
 
   const MENU_OPTIONS = [
@@ -42,6 +69,13 @@ export default function ProfileScreen() {
       color: COLORS.info,
     },
     {
+      id: 'notifications',
+      title: 'Notifications',
+      icon: Bell,
+      route: '/notifications',
+      color: COLORS.secondary,
+    },
+    {
       id: 'support',
       title: 'Help & Support',
       icon: HelpCircle,
@@ -58,34 +92,65 @@ export default function ProfileScreen() {
         {/* User Info Header Card */}
         <View style={styles.userCard}>
           <View style={styles.avatarCircle}>
-            <Text style={styles.avatarInitial}>
-              {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
-            </Text>
+            <Text style={styles.avatarInitial}>{user?.name ? user.name.charAt(0).toUpperCase() : 'W'}</Text>
           </View>
 
           <View style={styles.userInfo}>
             <View style={styles.nameRow}>
-              <Text style={styles.userName}>{user?.name || 'Wrapchik Student'}</Text>
+              <Text style={styles.userName}>{user?.name || 'Your profile'}</Text>
               {isAdmin && (
                 <View style={styles.roleBadge}>
                   <Text style={styles.roleText}>ADMIN</Text>
                 </View>
               )}
             </View>
-            <Text style={styles.userEmail}>{user?.email || 'student@wrapchik.com'}</Text>
-            <Text style={styles.userPhone}>📱 {user?.phone || 'Not set'}</Text>
+            {user?.email ? <Text style={styles.userEmail}>{user.email}</Text> : null}
+            {user?.phone ? <Text style={styles.userPhone}>📱 {user.phone}</Text> : null}
+            {user?.emailVerified ? <Text style={styles.verifiedText}>Email verified</Text> : user?.phoneVerified ? <Text style={styles.verifiedText}>Phone verified</Text> : null}
           </View>
         </View>
 
+        {user ? (
+          <View style={styles.profileEditCard}>
+            <View style={styles.profileEditHeader}>
+              <Text style={styles.sectionTitle}>Personal details</Text>
+              {!editingName ? (
+                <TouchableOpacity
+                  onPress={() => { setName(user.name || ''); setProfileError(''); setProfileNotice(''); setEditingName(true); }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Edit name"
+                >
+                  <Text style={styles.editLink}>Edit name</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+            {editingName ? (
+              <>
+                <Input label="Name" value={name} onChangeText={setName} placeholder="Your name" autoCapitalize="words" maxLength={80} />
+                <View style={styles.editActions}>
+                  <Button title="Save name" onPress={handleSaveName} loading={saving} style={styles.saveNameButton} />
+                  <TouchableOpacity onPress={() => { setEditingName(false); setName(user.name || ''); setProfileError(''); }} accessibilityRole="button" style={styles.cancelEdit}>
+                    <Text style={styles.cancelEditText}>Cancel</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            ) : null}
+            {profileError ? <Text accessibilityRole="alert" style={styles.profileError}>{profileError}</Text> : null}
+            {profileNotice ? <Text accessibilityRole="status" style={styles.profileNotice}>{profileNotice}</Text> : null}
+          </View>
+        ) : null}
+
         {/* Menu Navigation Group */}
         <View style={styles.menuGroup}>
-          {MENU_OPTIONS.filter(option => option.id !== 'admin' || isAdmin).map((item) => {
+          {MENU_OPTIONS.filter((item) => item.id !== 'admin' || isAdmin).map((item) => {
             const IconComp = item.icon;
             return (
               <TouchableOpacity
                 key={item.id}
                 onPress={() => router.push(item.route)}
                 style={styles.menuItem}
+                accessibilityRole="button"
+                accessibilityLabel={item.title}
               >
                 <View style={[styles.iconBox, { backgroundColor: `${item.color}15` }]}>
                   <IconComp size={20} color={item.color} />
@@ -103,10 +168,10 @@ export default function ProfileScreen() {
           <Text style={styles.infoText}>Wrapchik v1.0.0 • Fresh. Fast. Flavorful.</Text>
         </View>
 
-        {/* Logout Button */}
-        <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>
-          <LogOut size={20} color={COLORS.danger} />
-          <Text style={styles.logoutText}>Log Out Account</Text>
+        {/* Account Action */}
+        <TouchableOpacity onPress={user ? handleLogout : () => router.push('/(auth)/login')} style={[styles.logoutBtn, !user && styles.loginBtn]}>
+          {user ? <LogOut size={20} color={COLORS.danger} /> : <LogIn size={20} color={COLORS.primary} />}
+          <Text style={[styles.logoutText, !user && styles.loginText]}>{user ? 'Log Out Account' : 'Sign In to Wrapchik'}</Text>
         </TouchableOpacity>
       </ScrollView>
     </View>
@@ -120,21 +185,25 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
+    maxWidth: 720,
+    width: '100%',
+    alignSelf: 'center',
+    paddingBottom: 28,
   },
   userCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderRadius: 16,
+    padding: 18,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: COLORS.border,
     marginBottom: 20,
   },
   avatarCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 64,
+    height: 64,
+    borderRadius: 22,
     backgroundColor: COLORS.primaryLight,
     justifyContent: 'center',
     alignItems: 'center',
@@ -179,9 +248,20 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     marginTop: 2,
   },
+  verifiedText: { color: COLORS.success, fontSize: 12, fontWeight: '700', marginTop: 4 },
+  profileEditCard: { backgroundColor: '#FFFFFF', padding: 16, borderRadius: 18, borderWidth: 1, borderColor: COLORS.border, marginBottom: 20 },
+  profileEditHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  sectionTitle: { fontSize: 15, fontWeight: '800', color: COLORS.textPrimary },
+  editLink: { color: COLORS.primary, fontSize: 13, fontWeight: '800', padding: 8 },
+  editActions: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  saveNameButton: { flex: 1 },
+  cancelEdit: { padding: 12 },
+  cancelEditText: { color: COLORS.textSecondary, fontWeight: '700' },
+  profileError: { color: COLORS.danger, marginTop: 8, fontSize: 12, fontWeight: '700' },
+  profileNotice: { color: COLORS.success, marginTop: 8, fontSize: 12, fontWeight: '700' },
   menuGroup: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: COLORS.border,
     overflow: 'hidden',
@@ -190,7 +270,9 @@ const styles = StyleSheet.create({
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 14,
+    minHeight: 64,
+    paddingHorizontal: 15,
+    paddingVertical: 11,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
   },
@@ -225,12 +307,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: COLORS.dangerLight,
     height: 50,
-    borderRadius: 12,
+    borderRadius: 15,
     gap: 8,
   },
+  loginBtn: { backgroundColor: COLORS.primaryLight },
   logoutText: {
     fontSize: 15,
     fontWeight: '800',
     color: COLORS.danger,
   },
+  loginText: { color: COLORS.primaryDark },
 });

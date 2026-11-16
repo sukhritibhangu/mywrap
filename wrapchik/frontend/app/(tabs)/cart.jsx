@@ -1,5 +1,5 @@
-import React, { useContext } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
+import React, { useContext, useState } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Trash2, MapPin } from 'lucide-react-native';
 import { CartContext } from '../../context/CartContext';
@@ -11,7 +11,13 @@ import COLORS from '../../constants/colors';
 
 export default function CartScreen() {
   const router = useRouter();
-  const { cartItems, subtotal, taxAndFees, grandTotal, clearCart } = useContext(CartContext);
+  const { cartItems, cartCount, subtotal, taxAndFees, grandTotal, clearCart } = useContext(CartContext);
+  const [checkoutBusy, setCheckoutBusy] = useState(false);
+
+  const confirmClear = () => Alert.alert('Clear your cart?', 'All items will be removed from this cart.', [
+    { text: 'Keep items', style: 'cancel' },
+    { text: 'Clear cart', style: 'destructive', onPress: clearCart },
+  ]);
 
   return (
     <View style={styles.container}>
@@ -28,9 +34,9 @@ export default function CartScreen() {
         <View style={styles.content}>
           <View style={styles.clearHeader}>
             <Text style={styles.itemCountText}>
-              {cartItems.length} {cartItems.length === 1 ? 'Item' : 'Items'} Selected
+              {cartCount} {cartCount === 1 ? 'item' : 'items'} in your bag
             </Text>
-            <TouchableOpacity onPress={clearCart} style={styles.clearBtn}>
+            <TouchableOpacity onPress={confirmClear} style={styles.clearBtn} accessibilityRole="button" accessibilityLabel="Clear cart">
               <Trash2 size={16} color={COLORS.danger} />
               <Text style={styles.clearText}>Clear Cart</Text>
             </TouchableOpacity>
@@ -47,19 +53,19 @@ export default function CartScreen() {
           <View style={styles.pickupBox}>
             <MapPin size={18} color={COLORS.primary} />
             <Text style={styles.pickupText}>
-              Pickup Location: <Text style={styles.pickupBold}>Wrapchik SAC Counter</Text>
+              Pickup at <Text style={styles.pickupBold}>Wrapchik SAC Counter</Text>. You can select another enabled option at checkout.
             </Text>
           </View>
 
           {/* Bill Summary Breakdown */}
           <View style={styles.billCard}>
-            <Text style={styles.billTitle}>Bill Details</Text>
+            <Text style={styles.billTitle}>Order estimate</Text>
             <View style={styles.billRow}>
               <Text style={styles.billLabel}>Item Subtotal</Text>
               <Text style={styles.billValue}>₹{subtotal}</Text>
             </View>
             <View style={styles.billRow}>
-              <Text style={styles.billLabel}>Taxes & Campus Fee (5%)</Text>
+            <Text style={styles.billLabel}>Taxes & fees (5%)</Text>
               <Text style={styles.billValue}>₹{taxAndFees}</Text>
             </View>
             <View style={styles.divider} />
@@ -69,8 +75,9 @@ export default function CartScreen() {
             </View>
 
             <Button
-              title={`Proceed to Checkout • ₹${grandTotal}`}
-              onPress={() => router.push('/checkout')}
+              title={`Continue · ₹${grandTotal}`}
+              loading={checkoutBusy}
+              onPress={() => { if (!checkoutBusy) { setCheckoutBusy(true); router.push('/checkout'); setTimeout(() => setCheckoutBusy(false), 1200); } }}
               style={styles.checkoutBtn}
             />
           </View>
@@ -87,13 +94,16 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+    maxWidth: 760,
+    width: '100%',
+    alignSelf: 'center',
   },
   clearHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
   },
   itemCountText: {
     fontSize: 14,
@@ -104,6 +114,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    minHeight: 44,
+    paddingHorizontal: 8,
   },
   clearText: {
     fontSize: 13,
@@ -119,7 +131,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primaryLight,
     padding: 12,
     marginHorizontal: 16,
-    borderRadius: 12,
+    borderRadius: 16,
     gap: 8,
     marginVertical: 8,
   },
@@ -134,8 +146,8 @@ const styles = StyleSheet.create({
   billCard: {
     backgroundColor: '#FFFFFF',
     padding: 16,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     borderWidth: 1,
     borderColor: COLORS.border,
     shadowColor: '#000',
@@ -143,6 +155,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 6,
     elevation: 4,
+    maxWidth: 760,
+    width: '100%',
+    alignSelf: 'center',
   },
   billTitle: {
     fontSize: 16,
