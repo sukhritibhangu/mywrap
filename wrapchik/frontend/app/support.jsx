@@ -1,13 +1,14 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking } from 'react-native';
-import { Phone, Mail, MessageSquare, HelpCircle, ChevronRight } from 'lucide-react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { ShoppingBag, HelpCircle, ChevronRight } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
 import Header from '../components/common/Header';
 import COLORS from '../constants/colors';
 
 const FAQS = [
   {
     q: 'How do I place an order?',
-    a: 'Browse the menu on the Home tab, select your food item & customizations, add to cart, proceed to checkout, and complete online payment.',
+    a: 'Browse the live menu, choose any available customizations, add items to your cart, and select an enabled fulfillment and payment option at checkout.',
   },
   {
     q: 'Where do I pickup my food order?',
@@ -15,48 +16,28 @@ const FAQS = [
   },
   {
     q: 'What payment methods are supported?',
-    a: 'We support all online payment options via Razorpay including UPI (GPay, PhonePe, Paytm), Credit/Debit Cards, Net Banking, and Wallets.',
+    a: 'Choose cash at the counter or UPI at checkout. UPI shows a QR with the server-calculated order total; submit the transaction reference after paying. The outlet verifies receipt manually before the order is marked paid.',
   },
   {
     q: 'What if my payment fails?',
-    a: 'If money was deducted during a failed transaction, Razorpay will automatically process a refund back to your payment account within 3–5 working days.',
+    a: 'Check the payment status on your order and contact the outlet if a payment was debited but the order still shows pending. UPI claims are reviewed manually by outlet staff.',
   },
 ];
 
 export default function SupportScreen() {
-  const handleCall = () => {
-    Linking.openURL('tel:+919876543210');
-  };
-
-  const handleEmail = () => {
-    Linking.openURL('mailto:support@wrapchik.com');
-  };
+  const router = useRouter();
 
   return (
     <View style={styles.container}>
       <Header title="Help & Support" showBack showCart={false} />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Contact Banner Cards */}
-        <Text style={styles.sectionTitle}>Contact Shopkeeper</Text>
-
-        <View style={styles.contactRow}>
-          <TouchableOpacity onPress={handleCall} style={styles.contactCard}>
-            <View style={[styles.iconCircle, { backgroundColor: COLORS.successLight }]}>
-              <Phone size={22} color={COLORS.success} />
-            </View>
-            <Text style={styles.contactTitle}>Call Shop</Text>
-            <Text style={styles.contactVal}>+91 98765 43210</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={handleEmail} style={styles.contactCard}>
-            <View style={[styles.iconCircle, { backgroundColor: COLORS.infoLight }]}>
-              <Mail size={22} color={COLORS.info} />
-            </View>
-            <Text style={styles.contactTitle}>Email Support</Text>
-            <Text style={styles.contactVal}>support@wrapchik.com</Text>
-          </TouchableOpacity>
-        </View>
+        {/* Order support entry point */}
+        <TouchableOpacity onPress={() => router.push('/(tabs)/orders')} style={styles.supportLink} accessibilityRole="button">
+          <View style={styles.supportIcon}><ShoppingBag size={21} color={COLORS.primary} /></View>
+          <View style={styles.supportLinkCopy}><Text style={styles.contactTitle}>Need help with an order?</Text><Text style={styles.contactVal}>Open your orders to view status or report an issue.</Text></View>
+          <ChevronRight size={18} color={COLORS.textSecondary} />
+        </TouchableOpacity>
 
         {/* FAQs */}
         <Text style={styles.sectionTitle}>Frequently Asked Questions</Text>
@@ -82,6 +63,9 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
+    maxWidth: 760,
+    width: '100%',
+    alignSelf: 'center',
   },
   sectionTitle: {
     fontSize: 16,
@@ -90,28 +74,9 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 12,
   },
-  contactRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 20,
-  },
-  contactCard: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderRadius: 16,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  iconCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
+  supportLink: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: COLORS.border, borderRadius: 18, padding: 14, marginBottom: 22 },
+  supportIcon: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.primaryLight },
+  supportLinkCopy: { flex: 1 },
   contactTitle: {
     fontSize: 14,
     fontWeight: '800',

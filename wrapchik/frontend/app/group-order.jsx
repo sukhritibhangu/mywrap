@@ -1,13 +1,15 @@
-import React, { useState } from 'react';
+import React, { useContext, useState } from 'react';
 import { View, StyleSheet, Text, TextInput, TouchableOpacity, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import Header from '../components/common/Header';
 import Button from '../components/common/Button';
 import groupService from '../services/groupService';
+import { AuthContext } from '../context/AuthContext';
 import COLORS from '../constants/colors';
 
 export default function GroupOrderScreen() {
   const router = useRouter();
+  const { user } = useContext(AuthContext);
   const [tab, setTab] = useState('CREATE'); // CREATE, JOIN, LOBBY
   const [groupCode, setGroupCode] = useState('');
   const [orderType, setOrderType] = useState('TAKEAWAY'); // TAKEAWAY, DELIVERY
@@ -21,7 +23,7 @@ export default function GroupOrderScreen() {
       if (orderType === 'DELIVERY') data.hostel = hostel;
       const res = await groupService.createGroup(data);
       if (res.success) {
-        setGroupDetails(res.data);
+        setGroupDetails(res.group);
         setTab('LOBBY');
       }
     } catch (e) {
@@ -33,7 +35,7 @@ export default function GroupOrderScreen() {
     try {
       const res = await groupService.joinGroup(groupCode);
       if (res.success) {
-        setGroupDetails(res.data);
+        setGroupDetails(res.group);
         setTab('LOBBY');
       }
     } catch (e) {
@@ -121,10 +123,10 @@ export default function GroupOrderScreen() {
 
             <Text style={styles.label}>Members</Text>
             {groupDetails.members?.map((m, i) => (
-              <Text key={i} style={styles.memberText}>- {m.user?.name || 'Member'}</Text>
+              <Text key={i} style={styles.memberText}>- {m.name || m.userId?.name || 'Member'}</Text>
             ))}
 
-            {groupDetails.leader?._id === 'CURRENT_USER_ID' && groupDetails.status === 'OPEN' && (
+            {String(groupDetails.leaderId?._id || groupDetails.leaderId) === String(user?._id) && groupDetails.status === 'OPEN' && (
               <Button title="Lock Group" onPress={handleLockGroup} style={{ marginTop: 20 }} />
             )}
 

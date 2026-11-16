@@ -1,160 +1,156 @@
-import React, { useState, useContext } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
+import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TextInput, Linking, Platform, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Smartphone, CreditCard, Landmark, Wallet, ShieldCheck, LockKeyhole } from 'lucide-react-native';
+import QRCode from 'react-native-qrcode-svg';
 import { AuthContext } from '../context/AuthContext';
 import { CartContext } from '../context/CartContext';
 import Header from '../components/common/Header';
 import Button from '../components/common/Button';
 import paymentService from '../services/paymentService';
+import orderService from '../services/orderService';
+import { clearCheckoutIntentKey } from '../services/checkoutIntent';
 import COLORS from '../constants/colors';
 
-const PAYMENT_METHODS = [
-  { id: 'UPI', name: 'UPI', icon: Smartphone, desc: 'GPay • PhonePe • Paytm' },
-  { id: 'CARD', name: 'Cards', icon: CreditCard, desc: 'Credit / Debit' },
-  { id: 'NETBANKING', name: 'Net Banking', icon: Landmark, desc: 'All major banks' },
-  { id: 'WALLET', name: 'Wallets', icon: Wallet, desc: 'Supported wallets' },
-];
-
 export default function PaymentScreen() {
-  const { orderId, amount, orderNumber } = useLocalSearchParams();
+  const params = useLocalSearchParams();
   const router = useRouter();
   const { user } = useContext(AuthContext);
   const { clearCart } = useContext(CartContext);
-  const [selectedMethod, setSelectedMethod] = useState('UPI');
-  const [processing, setProcessing] = useState(false);
+  const rawOrderId = Array.isArray(params.orderId) ? params.orderId[0] : params.orderId;
+  const orderId = typeof rawOrderId === 'string' ? rawOrderId : '';
+  const [order, setOrder] = useState(null);
+  const [instructions, setInstructions] = useState(null);
+  const [reference, setReference] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  const [isError, setIsError] = useState(false);
+  const [upiAppUnavailable, setUpiAppUnavailable] = useState(false);
+  const autoLaunchAttemptedUri = useRef('');
 
-  const handlePayNow = async () => {
-    if (Platform.OS === 'web') {
-      Alert.alert('Mobile checkout required', 'Razorpay native checkout is configured for the Android/iOS app. Build a native development/release app to test payments.');
-      return;
-    }
-
-    setProcessing(true);
+  const refresh = useCallback(async (showFeedback = false) => {
+    if (!orderId) { setLoading(false); return; }
     try {
-      const createRes = await paymentService.createRazorpayOrder(orderId);
-      const gatewayOrder = createRes?.razorpayOrder;
-      if (!gatewayOrder?.id || !gatewayOrder?.key) throw new Error('Payment session could not be created');
-
-      // react-native-razorpay uses native Android/iOS checkout.
-      // eslint-disable-next-line global-require
-      const RazorpayCheckout = require('react-native-razorpay').default || require('react-native-razorpay');
-      const checkoutOptions = {
-        description: `Wrapchik order #${orderNumber}`,
-        image: 'https://cdn.razorpay.com/logos/razorpay.png',
-        currency: gatewayOrder.currency || 'INR',
-        key: gatewayOrder.key,
-        amount: String(gatewayOrder.amount),
-        name: 'Wrapchik',
-        order_id: gatewayOrder.id,
-        prefill: {
-          name: user?.name || '',
-          email: user?.email || '',
-          contact: user?.phone || '',
-        },
-        theme: { color: COLORS.primary },
-        retry: { enabled: true, max_count: 2 },
-      };
-
-      const paymentData = await RazorpayCheckout.open(checkoutOptions);
-
-      const verifyRes = await paymentService.verifyPayment({
-        orderId,
-        razorpay_order_id: paymentData.razorpay_order_id,
-        razorpay_payment_id: paymentData.razorpay_payment_id,
-        razorpay_signature: paymentData.razorpay_signature,
-        method: paymentData.method || selectedMethod,
-      });
-
-      if (!verifyRes?.success) throw new Error(verifyRes?.message || 'Payment verification failed');
-
-      clearCart();
-      router.replace({
-        pathname: '/order-confirmation',
-        params: {
-          orderId,
-          orderNumber: verifyRes.orderNumber || orderNumber,
-          totalPaid: amount,
-          method: paymentData.method || selectedMethod,
-        },
-      });
-    } catch (e) {
-      if (String(e?.code) === '2' || /cancel/i.test(e?.description || e?.message || '')) {
-        Alert.alert('Payment cancelled', 'Your order is saved. You can try the payment again.');
-      } else {
-        Alert.alert('Payment failed', e?.description || e?.message || 'Please try again.');
+      const result = await orderService.getOrderById(orderId);
+      if (!result?.success || !result.order) throw new Error('Order details are unavailable.');
+      setOrder(result.order);
+      if (result.order.paymentMethod === 'UPI_QR' && result.order.paymentStatus !== 'SUCCESS') {
+        const response = await paymentService.getUpiInstructions(orderId);
+        setInstructions(response?.instructions || null);
       }
-    } finally {
-      setProcessing(false);
+      if (result.order.paymentStatus === 'SUCCESS') {
+        router.replace({ pathname: '/order-confirmation', params: { orderId, orderNumber: result.order.orderNumber, method: 'UPI (verified by outlet)' } });
+      }
+      if (showFeedback) { setMessage('Payment status refreshed.'); setIsError(false); }
+    } catch (error) {
+      if (showFeedback) { setMessage(error.message || 'Could not refresh payment status.'); setIsError(true); }
+    } finally { setLoading(false); }
+  }, [orderId, router]);
+
+  useEffect(() => { clearCart(); clearCheckoutIntentKey(); refresh(); }, [clearCart, refresh]);
+
+  const openUpiApp = useCallback(async () => {
+    if (!instructions?.upiUri) return;
+    setUpiAppUnavailable(false);
+    try {
+      await Linking.openURL(instructions.upiUri);
+    } catch {
+      setUpiAppUnavailable(true);
+      setMessage(Platform.OS === 'web'
+        ? 'A UPI app could not be opened here. Scan the QR code with a UPI app on your phone.'
+        : 'No compatible UPI app opened. Scan the QR code with Google Pay, PhonePe, Paytm, BHIM, or another UPI app.');
+      setIsError(false);
     }
+  }, [instructions?.upiUri]);
+
+  useEffect(() => {
+    const uri = instructions?.upiUri;
+    if (Platform.OS !== 'android' || !uri || order?.paymentStatus === 'SUCCESS' || autoLaunchAttemptedUri.current === uri) return;
+    autoLaunchAttemptedUri.current = uri;
+    openUpiApp();
+  }, [instructions?.upiUri, order?.paymentStatus, openUpiApp]);
+
+  const submitReference = async () => {
+    if (busy) return;
+    setBusy(true); setMessage('');
+    try {
+      const response = await paymentService.submitUpiReference(orderId, reference);
+      setMessage(response?.message || 'Reference submitted. Payment remains pending until the outlet verifies receipt.');
+      setIsError(false); setReference(''); await refresh();
+    } catch (error) { setMessage(error.message || 'Could not submit this reference.'); setIsError(true); }
+    finally { setBusy(false); }
   };
 
-  return (
-    <View style={styles.container}>
-      <Header title="Secure Payment" showBack showCart={false} />
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.amountCard}>
-          <Text style={styles.amountLabel}>TOTAL TO PAY</Text>
-          <Text style={styles.amountValue}>₹{amount || '0'}</Text>
-          <Text style={styles.orderRef}>Order #{orderNumber}</Text>
-          <View style={styles.securePill}><LockKeyhole size={13} color="#FFF" /><Text style={styles.secureText}>Secure checkout</Text></View>
-        </View>
+  if (loading) return <View style={styles.container}><Header title="UPI payment" showBack showCart={false} /><ActivityIndicator color={COLORS.primary} style={{ marginTop: 60 }} /></View>;
+  if (!order) return <View style={styles.container}><Header title="Payment details" showBack showCart={false} /><View style={styles.content}><Text style={styles.title}>Order details are unavailable</Text><Text style={styles.muted}>Check your order history for the latest status.</Text><Button title="View orders" onPress={() => router.replace('/(tabs)/orders')} style={styles.buttonGap} /></View></View>;
 
-        <Text style={styles.sectionTitle}>Choose a preferred method</Text>
-        <Text style={styles.sectionSub}>Razorpay may show additional methods based on your account.</Text>
-        <View style={styles.grid}>
-          {PAYMENT_METHODS.map((method) => {
-            const Icon = method.icon;
-            const active = selectedMethod === method.id;
-            return (
-              <TouchableOpacity key={method.id} onPress={() => setSelectedMethod(method.id)} style={[styles.methodCard, active && styles.methodActive]} activeOpacity={0.85}>
-                <View style={[styles.methodIcon, active && styles.methodIconActive]}><Icon size={21} color={active ? COLORS.primary : COLORS.textSecondary} /></View>
-                <Text style={[styles.methodName, active && styles.methodNameActive]}>{method.name}</Text>
-                <Text style={styles.methodDesc}>{method.desc}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+  if (order.paymentMethod !== 'UPI_QR') {
+    const legacy = ['CASHFREE', 'RAZORPAY'].includes(order.paymentMethod);
+    return <View style={styles.container}><Header title="Payment status" showBack showCart={false} /><View style={styles.content}>
+      <Text style={styles.title}>{legacy ? 'Historical gateway order' : 'Cash at counter'}</Text>
+      <Text style={styles.muted}>{legacy ? 'This order uses a legacy payment method. Its saved payment status remains available in order details.' : 'Pay at the Wrapchik counter when you collect your order.'}</Text>
+      <Text style={styles.status}>Order #{order.orderNumber} · {order.paymentStatus}</Text>
+      <Button title="View order status" onPress={() => router.replace(`/order-tracking/${orderId}`)} style={styles.buttonGap} />
+    </View></View>;
+  }
 
-        <View style={styles.securityBox}>
-          <ShieldCheck size={20} color={COLORS.success} />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.securityTitle}>Payment secured by Razorpay</Text>
-            <Text style={styles.securityText}>Card/UPI details are handled by the payment gateway. Wrapchik only receives the payment result.</Text>
-          </View>
-        </View>
-      </ScrollView>
-      <View style={styles.footer}>
-        <Button title={processing ? 'Opening secure checkout…' : `Pay ₹${amount || '0'}`} onPress={handlePayNow} loading={processing} style={styles.payBtn} />
-        <Text style={styles.footerNote}>You will confirm the payment inside Razorpay.</Text>
+  const submittedReference = order.paymentId?.upiTransactionReference;
+  const rejectedReason = order.paymentId?.verificationReason;
+  const canSubmit = order.paymentStatus !== 'SUCCESS' && order.orderStatus !== 'CANCELLED' && order.orderStatus !== 'REJECTED' && (!submittedReference || order.paymentStatus === 'FAILED');
+  return <View style={styles.container}>
+    <Header title="UPI payment" showBack showCart={false} />
+    <ScrollView contentContainerStyle={styles.content}>
+      <View style={styles.amountCard}>
+        <Text style={styles.amountLabel}>PAY EXACTLY</Text>
+        <Text style={styles.amount}>₹{Number(instructions?.amount ?? order.totalAmount).toFixed(2)}</Text>
+        <Text style={styles.orderText}>Order #{order.orderNumber}</Text>
       </View>
-    </View>
-  );
+      {instructions?.upiUri ? <View style={styles.qrCard}><QRCode value={instructions.upiUri} size={220} backgroundColor="#FFFFFF" color="#1E2633" /><Text style={styles.qrHint}>Scan with Google Pay, PhonePe, Paytm, BHIM, or another UPI app.</Text></View> : <Text style={styles.error}>UPI payment is not currently available. Contact the outlet or choose another method for a new order.</Text>}
+      {upiAppUnavailable ? <Text style={styles.fallbackHint}>No compatible UPI app was found. Use the QR code above with a UPI app on another device.</Text> : null}
+      {instructions ? <View style={styles.detailsCard}>
+        <Text style={styles.detailLabel}>PAYEE</Text><Text style={styles.detailValue}>{instructions.payeeName}</Text>
+        <Text style={styles.detailLabel}>UPI ID</Text><Text style={styles.detailValue}>{instructions.upiId}</Text>
+        <Text style={styles.detailLabel}>ORDER REFERENCE</Text><Text style={styles.detailValue}>{instructions.orderNumber}</Text>
+      </View> : null}
+      <Button title="Pay using UPI App" onPress={openUpiApp} disabled={!instructions?.upiUri} />
+      <Text style={styles.instruction}>After paying, return here and submit the UPI transaction reference. The outlet will check its receipt records and confirm the payment manually. Opening an app or submitting a reference never marks an order as paid.</Text>
+      {submittedReference && order.paymentStatus === 'PENDING' ? <View style={styles.pendingBox}><Text style={styles.pendingText}>Reference {submittedReference} is awaiting outlet verification.</Text></View> : null}
+      {rejectedReason ? <View style={styles.rejectedBox}><Text style={styles.rejectedTitle}>Payment claim rejected</Text><Text style={styles.instruction}>{rejectedReason}</Text></View> : null}
+      {canSubmit ? <>
+        <Text style={styles.detailLabel}>UPI TRANSACTION REFERENCE</Text>
+        <TextInput value={reference} onChangeText={setReference} placeholder="Enter reference from your UPI app" autoCapitalize="characters" style={styles.input} editable={!busy} />
+        <Button title={busy ? 'Submitting…' : 'I have completed the payment'} onPress={submitReference} loading={busy} disabled={busy || reference.trim().length < 8} style={styles.buttonGap} />
+      </> : null}
+      {message ? <Text accessibilityRole={isError ? 'alert' : 'status'} style={[styles.message, isError && styles.error]}>{message}</Text> : null}
+      <View style={styles.statusRow}><Text style={styles.status}>Payment status: {order.paymentStatus}</Text><Button title="Refresh status" variant="outline" onPress={() => refresh(true)} /></View>
+      <Button title="View order status" variant="outline" onPress={() => router.replace(`/order-tracking/${orderId}`)} style={styles.buttonGap} />
+    </ScrollView>
+  </View>;
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  scrollContent: { padding: 16, paddingBottom: 30 },
-  amountCard: { backgroundColor: COLORS.primary, borderRadius: 22, padding: 22, alignItems: 'center', marginBottom: 22, elevation: 4 },
+  content: { padding: 16, paddingBottom: 32, maxWidth: 620, width: '100%', alignSelf: 'center' },
+  amountCard: { backgroundColor: COLORS.primary, borderRadius: 20, padding: 22, alignItems: 'center', marginBottom: 16 },
   amountLabel: { color: '#FFE5D8', fontSize: 11, fontWeight: '900', letterSpacing: 1 },
-  amountValue: { color: '#FFF', fontSize: 38, fontWeight: '900', marginTop: 3 },
-  orderRef: { color: '#FFF', fontSize: 12, opacity: 0.9, marginTop: 3 },
-  securePill: { flexDirection: 'row', gap: 5, alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.15)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20, marginTop: 12 },
-  secureText: { color: '#FFF', fontSize: 11, fontWeight: '800' },
-  sectionTitle: { fontSize: 18, fontWeight: '900', color: COLORS.textPrimary },
-  sectionSub: { fontSize: 12, color: COLORS.textSecondary, marginTop: 3, marginBottom: 12 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  methodCard: { width: '48%', minHeight: 105, backgroundColor: '#FFF', borderRadius: 15, borderWidth: 1.5, borderColor: COLORS.border, padding: 12 },
-  methodActive: { borderColor: COLORS.primary, backgroundColor: COLORS.primaryLight },
-  methodIcon: { width: 34, height: 34, borderRadius: 10, backgroundColor: COLORS.inputBackground, alignItems: 'center', justifyContent: 'center', marginBottom: 7 },
-  methodIconActive: { backgroundColor: '#FFF' },
-  methodName: { fontSize: 14, fontWeight: '800', color: COLORS.textPrimary },
-  methodNameActive: { color: COLORS.primary },
-  methodDesc: { fontSize: 10, color: COLORS.textSecondary, marginTop: 2 },
-  securityBox: { flexDirection: 'row', gap: 10, backgroundColor: COLORS.successLight, padding: 13, borderRadius: 14, marginTop: 18 },
-  securityTitle: { fontSize: 12, fontWeight: '900', color: COLORS.textPrimary },
-  securityText: { fontSize: 11, lineHeight: 16, color: COLORS.textSecondary, marginTop: 2 },
-  footer: { backgroundColor: '#FFF', borderTopWidth: 1, borderTopColor: COLORS.border, padding: 16 },
-  payBtn: { width: '100%' },
-  footerNote: { textAlign: 'center', color: COLORS.textSecondary, fontSize: 10, marginTop: 8 },
+  amount: { color: '#FFF', fontSize: 38, fontWeight: '900', marginTop: 4 },
+  orderText: { color: '#FFF', fontSize: 13, marginTop: 4 },
+  qrCard: { backgroundColor: '#FFF', borderRadius: 18, padding: 18, alignItems: 'center', borderWidth: 1, borderColor: COLORS.border, marginBottom: 14 },
+  qrHint: { color: COLORS.textSecondary, fontSize: 12, textAlign: 'center', lineHeight: 18, marginTop: 14 },
+  detailsCard: { backgroundColor: '#FFF', borderWidth: 1, borderColor: COLORS.border, borderRadius: 14, padding: 15, marginBottom: 14 },
+  detailLabel: { color: COLORS.textSecondary, fontSize: 10, fontWeight: '900', letterSpacing: 0.8, marginTop: 8 },
+  detailValue: { color: COLORS.textPrimary, fontSize: 14, fontWeight: '800', marginTop: 2 },
+  instruction: { color: COLORS.textSecondary, fontSize: 12, lineHeight: 18, marginTop: 12, marginBottom: 12 },
+  input: { backgroundColor: '#FFF', borderColor: COLORS.border, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 12, color: COLORS.textPrimary, marginTop: 7 },
+  message: { backgroundColor: COLORS.warningLight, color: COLORS.textPrimary, padding: 12, borderRadius: 10, marginTop: 12, fontSize: 12 },
+  error: { color: COLORS.danger, backgroundColor: COLORS.dangerLight, padding: 12, borderRadius: 10, marginTop: 12, fontSize: 12, lineHeight: 18 },
+  pendingBox: { backgroundColor: COLORS.warningLight, borderRadius: 12, padding: 12, marginTop: 12 },
+  pendingText: { color: COLORS.textPrimary, fontSize: 12, fontWeight: '700' },
+  rejectedBox: { backgroundColor: COLORS.dangerLight, borderRadius: 12, padding: 12, marginTop: 12 },
+  rejectedTitle: { color: COLORS.danger, fontWeight: '900' },
+  status: { color: COLORS.textSecondary, fontSize: 12, fontWeight: '800', marginVertical: 12 },
+  statusRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, gap: 12 },
+  title: { color: COLORS.textPrimary, fontSize: 20, fontWeight: '900', marginTop: 20 },
+  muted: { color: COLORS.textSecondary, fontSize: 13, lineHeight: 19, marginTop: 8 },
+  buttonGap: { marginTop: 12 },
 });
