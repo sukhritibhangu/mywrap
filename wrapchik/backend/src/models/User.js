@@ -36,6 +36,13 @@ const userSchema = new mongoose.Schema(
       select: false,
     },
 
+    googleSubject: {
+      type: String,
+      unique: true,
+      sparse: true,
+      select: false,
+    },
+
     phoneVerified: {
       type: Boolean,
       default: false,
