@@ -1,39 +1,46 @@
-import React, { createContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AuthContext } from './AuthContext';
 
 export const CartContext = createContext();
 
 export const CartProvider = ({ children }) => {
+  const { user, isLoading: authLoading } = useContext(AuthContext);
+  const storageKey = user?._id ? `wrapchik_cart_items:${user._id}` : 'wrapchik_cart_items';
   const [cartItems, setCartItems] = useState([]);
+  const [loadedStorageKey, setLoadedStorageKey] = useState(null);
 
-  // Load stored cart from local storage on launch
+  // Keep carts isolated by signed-in account. The legacy guest cart remains intact.
   useEffect(() => {
-    loadCart();
-  }, []);
+    let active = true;
+    setLoadedStorageKey(null);
+    setCartItems([]);
+    if (authLoading) return () => { active = false; };
 
-  // Save cart whenever it changes
+    AsyncStorage.getItem(storageKey)
+      .then((storedCart) => {
+        if (!active) return;
+        if (!storedCart) return setCartItems([]);
+        const parsed = JSON.parse(storedCart);
+        setCartItems(Array.isArray(parsed) ? parsed : []);
+      })
+      .catch((error) => {
+        console.error('[CartContext Error] Failed to load cached cart:', error);
+        if (active) setCartItems([]);
+      })
+      .finally(() => {
+        if (active) setLoadedStorageKey(storageKey);
+      });
+
+    return () => { active = false; };
+  }, [authLoading, storageKey]);
+
   useEffect(() => {
-    saveCart(cartItems);
-  }, [cartItems]);
-
-  const loadCart = async () => {
-    try {
-      const storedCart = await AsyncStorage.getItem('wrapchik_cart_items');
-      if (storedCart) {
-        setCartItems(JSON.parse(storedCart));
-      }
-    } catch (e) {
-      console.error('[CartContext Error] Failed to load cached cart:', e);
-    }
-  };
-
-  const saveCart = async (items) => {
-    try {
-      await AsyncStorage.setItem('wrapchik_cart_items', JSON.stringify(items));
-    } catch (e) {
-      console.error('[CartContext Error] Failed to cache cart:', e);
-    }
-  };
+    if (loadedStorageKey !== storageKey) return;
+    AsyncStorage.setItem(storageKey, JSON.stringify(cartItems)).catch((error) => {
+      console.error('[CartContext Error] Failed to cache cart:', error);
+    });
+  }, [cartItems, loadedStorageKey, storageKey]);
 
   // Add item to cart with customization matching
   const addToCart = (product, selectedCustomizations = [], quantity = 1) => {
@@ -97,7 +104,7 @@ export const CartProvider = ({ children }) => {
   const clearCart = async () => {
     setCartItems([]);
     try {
-      await AsyncStorage.removeItem('wrapchik_cart_items');
+      await AsyncStorage.removeItem(storageKey);
     } catch (e) {
       console.error('[CartContext Error] Failed to clear cached cart:', e);
     }
