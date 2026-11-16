@@ -5,8 +5,10 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "nodemon src/server.js",
-    "db:check": "node src/scripts/checkDb.js"
+    "dev": "nodemon src/scripts/devServer.js",
+    "db:check": "node src/scripts/checkDb.js",
+    "admin:recover": "node src/scripts/recoverAdmin.js",
+    "test": "node --test"
   },
   "keywords": [
     "express",
@@ -31,9 +33,10 @@
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^8.2.0",
     "multer": "^1.4.5-lts.1",
+    "nodemailer": "^10.5.0",
     "razorpay": "^2.9.8",
-    "socket.io": "^4.8.3",
-    "twilio": "^6.1.1"
+    "resend": "^6.37.0",
+    "socket.io": "^4.8.3"
   },
   "devDependencies": {
     "nodemon": "^3.1.0"
