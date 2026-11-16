@@ -1,6 +1,6 @@
 // Centralized Error Handling Middleware
 const errorHandler = (err, req, res, next) => {
-  let statusCode = res.statusCode === 200 ? 500 : res.statusCode;
+  let statusCode = Number(err.statusCode || err.status || (res.statusCode === 200 ? 500 : res.statusCode));
   let message = err.message || 'Internal Server Error';
 
   // Handle Mongoose Bad ObjectId (CastError)
@@ -22,7 +22,11 @@ const errorHandler = (err, req, res, next) => {
     message = Object.values(err.errors).map((val) => val.message).join(', ');
   }
 
-  console.error(`[Error Handler] ${statusCode} - ${message}`);
+  if (statusCode >= 500 && !err.expose) {
+    message = 'Internal Server Error';
+  }
+
+  console.error(`[Error Handler] ${statusCode} - ${statusCode >= 500 && !err.expose ? 'Request failed' : message}`);
 
   res.status(statusCode).json({
     success: false,

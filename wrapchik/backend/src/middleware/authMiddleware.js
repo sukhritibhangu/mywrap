@@ -16,7 +16,8 @@ const protect = async (req, res, next) => {
 
     const decoded = jwt.verify(
       token,
-      process.env.JWT_SECRET
+      process.env.JWT_SECRET,
+      { algorithms: ['HS256'] }
     );
 
     const user = await User.findById(decoded.id).select(
@@ -27,6 +28,13 @@ const protect = async (req, res, next) => {
       return res.status(401).json({
         success: false,
         message: 'User no longer exists',
+      });
+    }
+
+    if (!user.emailVerified && !user.phoneVerified) {
+      return res.status(403).json({
+        success: false,
+        message: 'Email verification required',
       });
     }
 
