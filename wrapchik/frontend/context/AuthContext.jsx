@@ -134,7 +134,7 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     setIsLoading(true);
     try {
-      const res = await authService.login(email, password);
+      const res = await authService.adminLogin(email, password);
       if (res.success && res.token) {
         await saveSession(res.token, res.user);
         return { success: true, user: res.user };
@@ -145,6 +145,17 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const loginWithGoogle = async (credential, challengeId, phone) => {
+    setIsLoading(true);
+    try {
+      const res = await authService.googleLogin(credential, challengeId, phone);
+      if (res.success && res.token) await saveSession(res.token, res.user);
+      return res;
+    } catch (error) {
+      return { success: false, message: error.message };
+    } finally { setIsLoading(false); }
   };
 
   const register = async (name, email, phone, password) => {
@@ -208,6 +219,7 @@ export const AuthProvider = ({ children }) => {
       isAuthenticated: !!token && !!user,
       isAdmin: user?.role === 'admin',
       login,
+      loginWithGoogle,
       register,
       verifyOtp,
       updateProfile,
