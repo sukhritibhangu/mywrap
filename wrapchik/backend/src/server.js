@@ -1,8 +1,9 @@
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const dotenv = require('dotenv');
 const connectDB = require('./config/db');
 const errorHandler = require('./middleware/errorMiddleware');
 const http = require('http');
@@ -10,16 +11,21 @@ const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
 const socketManager = require('./config/socketManager');
 
-// Load environment variables
-dotenv.config();
-
 if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
   throw new Error('JWT_SECRET must be set to a random value of at least 32 characters');
+}
+if (process.env.LOCAL_OTP_ENABLED === 'true' && process.env.NODE_ENV !== 'development') {
+  throw new Error('LOCAL_OTP_ENABLED is allowed only when NODE_ENV=development');
+}
+const trustProxyHops = Number(process.env.TRUST_PROXY_HOPS || 0);
+if (!Number.isInteger(trustProxyHops) || trustProxyHops < 0 || trustProxyHops > 5) {
+  throw new Error('TRUST_PROXY_HOPS must be an integer from 0 to 5');
 }
 
 // Initialize Express app
 const app = express();
 app.disable('x-powered-by');
+app.set('trust proxy', trustProxyHops);
 
 // Security middleware
 app.use(
@@ -28,13 +34,14 @@ app.use(
   })
 );
 
-app.use(
-  cors({
-    origin: process.env.CORS_ORIGIN
-      ? process.env.CORS_ORIGIN.split(',').map(v => v.trim())
-      : true,
-  })
-);
+const configuredOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',').map((origin) => origin.trim()).filter(Boolean)
+  : null;
+if (process.env.NODE_ENV === 'production' && configuredOrigins?.includes('*')) {
+  throw new Error('CORS_ORIGIN must list explicit origins in production');
+}
+const corsOrigin = configuredOrigins || (process.env.NODE_ENV === 'development' ? true : false);
+app.use(cors({ origin: corsOrigin }));
 
 // Rate limiting for auth routes
 const authLimiter = rateLimit({
@@ -45,14 +52,15 @@ const authLimiter = rateLimit({
 });
 app.use('/api/auth', authLimiter);
 
-// Razorpay webhook raw body BEFORE JSON parser
+// Payment-provider webhooks require the original raw request body for signatures.
 const { handleWebhook } = require('./controllers/paymentController');
+const { handleCashfreeWebhook } = require('./controllers/cashfreeController');
 app.post('/api/payment/webhook', express.raw({ type: 'application/json' }), handleWebhook);
+app.post('/api/payment/cashfree/webhook', express.raw({ type: 'application/json' }), handleCashfreeWebhook);
 
 // Normal parsers
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
-
 
 // API Health Check Endpoint
 app.get('/', (req, res) => {
@@ -74,34 +82,38 @@ app.use('/api/admin', require('./routes/adminRoutes'));
 app.use('/api/tables', require('./routes/tableRoutes'));
 app.use('/api/settings', require('./routes/settingsRoutes'));
 app.use('/api/groups', require('./routes/groupOrderRoutes'));
+app.use('/api/pickup-slots', require('./routes/pickupSlotRoutes'));
+app.use('/api/coupons', require('./routes/couponRoutes'));
 app.use('/api/notifications', require('./routes/notificationRoutes'));
 app.use('/api/issues', require('./routes/issueRoutes'));
 
 // Seeder function
 const seedInitialData = async () => {
   try {
+    if (process.env.SEED_SAMPLE_CATALOGUE === 'true' && process.env.NODE_ENV !== 'development') {
+      throw new Error('SEED_SAMPLE_CATALOGUE is allowed only in development');
+    }
     const Category = require('./models/Category');
     const Product = require('./models/Product');
     const User = require('./models/User');
     const bcrypt = require('bcryptjs');
 
-    const seedImage = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22160%22 height=%22160%22%3E%3Crect width=%22160%22 height=%22160%22 fill=%22%23fff3e0%22/%3E%3Ctext x=%2280%22 y=%22100%22 font-size=%2264%22 text-anchor=%22middle%22%3E%F0%9F%8C%AF%3C/text%3E%3C/svg%3E';
     const catCount = await Category.countDocuments();
-    if (catCount === 0) {
+    if (catCount === 0 && process.env.SEED_SAMPLE_CATALOGUE === 'true') {
       console.log('[Seeder] Seeding initial Wrapchik categories and menu items...');
 
-      const wrapsCat = await Category.create({ imageUrl: seedImage, name: 'Wraps', displayOrder: 1 });
-      const burgersCat = await Category.create({ imageUrl: seedImage, name: 'Burgers', displayOrder: 2 });
-      const friesCat = await Category.create({ imageUrl: seedImage, name: 'Fries & Sides', displayOrder: 3 });
-      const drinksCat = await Category.create({ imageUrl: seedImage, name: 'Drinks & Shakes', displayOrder: 4 });
+      const wrapsCat = await Category.create({ name: 'Wraps', imageUrl: 'https://images.unsplash.com/photo-1626700051175-6818013e1d4f?w=600', displayOrder: 1 });
+      const burgersCat = await Category.create({ name: 'Burgers', imageUrl: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600', displayOrder: 2 });
+      const friesCat = await Category.create({ name: 'Fries & Sides', imageUrl: 'https://images.unsplash.com/photo-1573080496219-bb080dd4f877?w=600', displayOrder: 3 });
+      const drinksCat = await Category.create({ name: 'Drinks & Shakes', imageUrl: 'https://images.unsplash.com/photo-1517701604599-bb29b565090c?w=600', displayOrder: 4 });
 
       await Product.create([
         {
           name: 'Paneer Tikka Wrap',
           description: 'Grilled paneer cubes marinated in rich tandoori spices.',
           price: 120,
+          imageUrl: 'https://images.unsplash.com/photo-1626700051175-6818013e1d4f?w=600',
           categoryId: wrapsCat._id,
-          imageUrl: seedImage,
           isVeg: true,
           available: true,
         },
@@ -109,28 +121,14 @@ const seedInitialData = async () => {
           name: 'Classic Veg Cheese Burger',
           description: 'Juicy spiced veg patty topped with cheddar cheese.',
           price: 80,
+          imageUrl: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600',
           categoryId: burgersCat._id,
-          imageUrl: seedImage,
           isVeg: true,
           available: true,
         },
       ]);
 
       console.log('[Seeder] Default Wrapchik menu items successfully seeded!');
-    }
-
-    if (process.env.ENABLE_DEMO_LOGIN === 'true') {
-      const email = 'demo@wrapchik.example';
-      if (!(await User.findOne({ email }))) {
-        await User.create({
-          name: 'Demo Student',
-          email,
-          phone: '0000000000',
-          passwordHash: await bcrypt.hash('WrapchikDemo2026!', 12),
-          role: 'student',
-        });
-        console.log('[Seeder] Shared demo student created.');
-      }
     }
 
     if (process.env.SEED_DEMO_ACCOUNTS === 'true') {
@@ -171,13 +169,8 @@ const seedInitialData = async () => {
       await Table.insertMany(tables);
       console.log('[Seeder] Default 8 dine-in tables created');
     }
-  } catch (err) {
-    console.warn('[Seeder Error]:', err.message);
-  }
+  } catch (err) { throw err; }
 };
-
-// Seed only after the database connection is ready.
-const databaseReady = connectDB().then(seedInitialData);
 
 // Error handler (last middleware)
 app.use(errorHandler);
@@ -185,46 +178,58 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 5000;
 const httpServer = http.createServer(app);
 const io = new Server(httpServer, {
-  cors: { origin: '*', methods: ['GET', 'POST'] },
+  cors: { origin: configuredOrigins || (process.env.NODE_ENV === 'development' ? '*' : false), methods: ['GET', 'POST'] },
 });
 
 // Initialize socket manager
 socketManager.init(io);
 
-// Socket.IO authentication
-io.on('connection', (socket) => {
-  const token = socket.handshake.query.token;
-  if (token) {
-    try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
-      socket.userId = decoded.id;
-      socket.join(`user_${decoded.id}`);
-
-      const User = require('./models/User');
-      User.findById(decoded.id).select('role').then(user => {
-        if (user && user.role === 'admin') {
-          socket.join('admin');
-          socket.join('kitchen');
-        }
-      });
-      console.log(`[Socket.IO] User ${decoded.id} connected`);
-    } catch (err) {
-      console.warn('[Socket.IO] Invalid token:', err.message);
-    }
+// Require an authenticated, existing account before allowing room membership.
+io.use(async (socket, next) => {
+  const token = socket.handshake.auth?.token;
+  if (typeof token !== 'string' || !token) return next(new Error('Authentication required'));
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
+    const User = require('./models/User');
+    const user = await User.findById(decoded.id).select('_id role');
+    if (!user) return next(new Error('Authentication required'));
+    socket.data.userId = String(user._id);
+    socket.data.role = user.role;
+    return next();
+  } catch (error) {
+    return next(new Error('Authentication required'));
   }
-
-  socket.on('disconnect', () => {
-    if (socket.userId) {
-      console.log(`[Socket.IO] User ${socket.userId} disconnected`);
-    }
-  });
 });
 
-databaseReady.then(() => {
-  httpServer.listen(PORT, '0.0.0.0', () => {
-    console.log(`[Wrapchik Server] Running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
-  });
-}).catch(error => {
-  console.error('[Startup]', error.message);
-  process.exit(1);
+io.on('connection', (socket) => {
+  const userId = socket.data.userId;
+  socket.join(`user_${userId}`);
+  if (socket.data.role === 'admin') {
+    socket.join('admin');
+    socket.join('kitchen');
+  }
+  console.log(`[Socket.IO] User ${userId} connected`);
+  socket.on('disconnect', () => console.log(`[Socket.IO] User ${userId} disconnected`));
 });
+
+const startServer = async () => {
+  await connectDB();
+  await seedInitialData();
+
+  return new Promise((resolve, reject) => {
+    httpServer.once('error', reject);
+    httpServer.listen(PORT, '0.0.0.0', () => {
+      console.log(`[Wrapchik Server] Running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
+      resolve();
+    });
+  });
+};
+
+if (require.main === module) {
+  startServer().catch((error) => {
+    console.error(`[Startup Error] ${error.message}`);
+    process.exitCode = 1;
+  });
+}
+
+module.exports = { app, httpServer, startServer };
