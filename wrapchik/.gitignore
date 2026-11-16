@@ -1,5 +1,10 @@
 node_modules/
 .env
+.env.*
+!.env.example
 .expo/
 android/
 ios/
+dist/
+web-build/
+coverage/

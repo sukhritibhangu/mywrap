@@ -1,6 +1,6 @@
 # 🌯 WRAPCHIK — Full-Stack Campus Food Ordering & Shop Management Application
 
-Wrapchik is a production-ready MVP designed for a college campus food outlet. It replaces slow, manual WhatsApp menu ordering with a fast, digital ordering platform for students and an intuitive, real-time shop management dashboard for shopkeepers.
+Wrapchik is an MVP designed for a college campus food outlet. It replaces slow, manual WhatsApp menu ordering with a digital ordering platform for students and a real-time shop management dashboard for shopkeepers.
 
 ---
 
@@ -22,7 +22,7 @@ This causes:
 Wrapchik provides a unified digital ordering platform:
 
 ### 🎓 Student Flow:
-`Open App ➔ Register/Login ➔ Browse Menu ➔ Search/Filter ➔ View Product & Customize ➔ Add to Cart ➔ Checkout ➔ Online Payment (Razorpay) ➔ Order Confirmation ➔ Live Order Tracker ➔ Pickup Order`
+`Open App ➔ Register/Login ➔ Browse Menu ➔ Search/Filter ➔ View Product & Customize ➔ Add to Cart ➔ Checkout ➔ Cash at Counter / outlet-verified UPI QR ➔ Order Confirmation ➔ Live Order Tracker ➔ Pickup Order`
 
 ### 👨‍🍳 Shopkeeper/Admin Flow:
 `Admin Login ➔ Dashboard ➔ Receive Live Order ➔ Accept/Reject ➔ Start Preparing ➔ Mark Ready for Pickup ➔ Complete Order ➔ Manage Inventory & Toggle Availability ➔ View Sales Analytics`
@@ -37,7 +37,7 @@ Wrapchik provides a unified digital ordering platform:
 - **Dynamic Home & Search**: Real-time menu search, category filtering, and Veg/Non-Veg toggles.
 - **Product Customization**: Dynamic price recalculation for add-ons (extra cheese, sauces).
 - **Persistent Cart Management**: Quantity adjustment, item removal, and subtotal/GST breakdown.
-- **Razorpay Online Payments**: Secure UPI, Card, NetBanking, and Wallet support with backend HMAC signature verification.
+- **Payments**: New orders use Cash at Counter with administrator receipt confirmation or order-specific UPI QR with manual outlet verification. Historical Cashfree and Razorpay orders remain readable and their backend verification code is retained.
 - **Live Visual Order Tracker**: Stepper timeline (`PLACED` ➔ `ACCEPTED` ➔ `PREPARING` ➔ `READY` ➔ `COMPLETED`).
 - **Order History & Favourites**: Past order receipts and quick re-order support.
 
@@ -58,7 +58,7 @@ Wrapchik provides a unified digital ordering platform:
 | **Backend REST API** | Node.js, Express.js |
 | **Database** | MongoDB, Mongoose ODM |
 | **Authentication** | JSON Web Tokens (JWT), bcryptjs |
-| **Payment Gateway** | Razorpay SDK & Web Integration |
+| **Payments** | Backend-generated UPI intent QR and admin-verified cash/UPI; legacy gateway code retained for old orders |
 | **Image Storage** | Cloudinary |
 | **Push Notifications** | Expo Notifications |
 
@@ -78,8 +78,8 @@ Wrapchik provides a unified digital ordering platform:
                                            │
              ┌─────────────────────────────┼─────────────────────────────┐
              ▼                             ▼                             ▼
-       MongoDB Atlas                   Razorpay                     Cloudinary
-     Database (Mongoose)            Online Payments                 Image Storage
+       MongoDB Atlas               UPI QR / Cash                Cloudinary
+     Database (Mongoose)          Manual Verification           Image Storage
 ```
 
 ---
@@ -116,66 +116,101 @@ Wrapchik provides a unified digital ordering platform:
 - `POST /api/orders/:id/cancel`: Cancel order if status is `PLACED`
 
 ### Payment Endpoints (`/api/payment`)
-- `POST /api/payment/create`: Generate Razorpay Order ID
-- `POST /api/payment/verify`: Verify Razorpay signature & confirm order
+- `POST /api/payment/create`, `/verify`, `/cashfree/create`, `/cashfree/reconcile`, `/cashfree/webhook`: Legacy gateway endpoints retained for old orders; unavailable from new checkout
+- `POST /api/payment/upi/submit`: Submit a UPI transaction reference (payment remains pending)
+- `GET /api/payment/upi/pending`, `POST /api/payment/upi/:id/review`: [Admin] Review UPI payment claims
+- `GET /api/payment/upi/:orderId/instructions`: Fetch a server-calculated amount and per-order UPI payment URI
+- `POST /api/payment/counter-confirm`: [Admin] Record counter cash receipt
 
 ### Admin Endpoints (`/api/admin`)
 - `GET /api/admin/orders`: Fetch all orders with status filter
 - `PUT /api/admin/orders/:id/status`: Update order state in state machine
 - `GET /api/admin/analytics`: Get revenue and order analytics
 
+New order creation accepts only `COUNTER` (cash) and `UPI_QR`. Cash remains pending until an administrator confirms receipt. UPI remains pending after reference submission until an administrator verifies the actual receipt. Gateway endpoints and schema values remain only to preserve historical orders; they are not offered in new checkout.
+
 ---
 
-## 🚀 How to Run the Application
+## 🚀 Run on Windows
 
 ### Prerequisites
-- Node.js (v18+)
-- npm or yarn
-- Expo Go app on mobile or Android/iOS Emulator
-- MongoDB instance (Local or Atlas)
 
-### 1. Backend Setup
-```bash
-cd backend
-npm install
+- Node.js and npm (the checked workspace uses Node 24 and npm 11).
+- MongoDB running locally on port 27017, or a MongoDB connection string.
+- Expo Go for browsing the app on a phone. Android UPI handoff uses the standard `upi://pay` URI and the operating system resolves installed compatible apps; QR scanning remains available if no app opens.
+- Local development email OTP is available when explicitly enabled. Real OTP delivery uses Resend email configured on the backend.
+
+The backend package is in `backend/` and the Expo app is in `frontend/`. Install dependencies from each package directory with `npm ci`; each has its own lockfile.
+
+### 1. Start MongoDB
+
+Start your local MongoDB service (the installed service may require an Administrator PowerShell or the Windows Services app), or set `MONGO_URI` in `backend/.env` to a MongoDB connection string. If the installed service is stopped, this command starts it with its existing data directory from an Administrator PowerShell:
+
+```powershell
+Start-Process 'C:\Program Files\MongoDB\Server\8.3\bin\mongod.exe' -ArgumentList '--config "C:\Program Files\MongoDB\Server\8.3\bin\mongod.cfg"' -WindowStyle Hidden
+```
+
+Check the local service with `Test-NetConnection 127.0.0.1 -Port 27017`; `TcpTestSucceeded` must be `True` before starting the API. The local default is `mongodb://127.0.0.1:27017/wrapchik`. The backend seeds a small menu and tables after the database connects. The project does not bundle MongoDB.
+
+### 2. Start the backend
+
+In a PowerShell terminal:
+
+```powershell
+Set-Location 'C:\Users\Tarang\Desktop\wrapchik\wrapchik_upgraded_16\wrapchik\backend'
+npm ci
+if (!(Test-Path .env)) { Copy-Item .env.example .env }
 npm run dev
 ```
-Server will start on `http://localhost:5000` and auto-seed initial campus menu items.
 
-### 2. Frontend Setup
-```bash
-cd frontend
-npm install
-npx expo start
+Edit `backend/.env` once before the first run: set a unique random `JWT_SECRET` of at least 32 characters. For local email OTP without sending email, set `NODE_ENV=development` and `LOCAL_OTP_ENABLED=true`; the short-lived code is returned only to the development app response and is never logged. For real delivery, configure `SMTP_USER` and `SMTP_APP_PASSWORD` in the backend `.env` (Gmail App Password); Gmail SMTP takes precedence over the optional Resend fallback. Never put email credentials in the frontend.
+
+When the server is ready, its health endpoint is `http://localhost:5000/`.
+
+### 3. Start the frontend
+
+Open a second PowerShell terminal. For Expo Go on a phone, replace `192.168.1.10` with the laptop's Wi-Fi IPv4 address:
+
+```powershell
+Set-Location 'C:\Users\Tarang\Desktop\wrapchik\wrapchik_upgraded_16\wrapchik\frontend'
+npm ci
+$env:EXPO_PUBLIC_API_URL = 'http://192.168.1.10:5000'
+npm start
 ```
 
----
+The API base URL must not include `/api`; the app appends it. For web on the laptop, use `http://localhost:5000` and run `npm run web -- --port 19006`. For the Android emulator, use `http://10.0.2.2:5000`. A physical phone and laptop must be on the same network, and the Windows firewall must allow the selected port.
 
-## 🔑 Environment Variables
+### Environment variables
 
-Create `.env` in `backend/`:
-```env
-PORT=5000
-MONGO_URI=mongodb://127.0.0.1:27017/wrapchik
-JWT_SECRET=wrapchik_super_secret_jwt_key_2026
-JWT_EXPIRE=30d
+`backend/.env.example` lists supported settings with placeholders. Create or edit `backend/.env` without replacing an existing file. Real email OTP uses backend-only Gmail SMTP settings (`SMTP_USER`, `SMTP_APP_PASSWORD`); optional Resend fallback uses `RESEND_API_KEY` and `EMAIL_FROM`. No payment-provider credentials are required for new checkout. An administrator configures the outlet's official UPI ID and payee name in Admin Settings, then enables UPI; the backend generates an amount-and-order-specific QR. Cash can be enabled or disabled there too. Do not commit `.env` files or put private credentials in the Expo frontend.
 
-# Razorpay Test Credentials
-RAZORPAY_KEY_ID=your_razorpay_test_key_id
-RAZORPAY_KEY_SECRET=your_razorpay_test_key_secret
+OTP sign-in, signup verification, and password recovery use email. Phone numbers remain required profile data for compatibility with existing accounts; they are not used for OTP delivery.
 
-# Cloudinary
-CLOUDINARY_CLOUD_NAME=wrapchik_cloud
-CLOUDINARY_API_KEY=123456789012345
-CLOUDINARY_API_SECRET=wrapchik_cloudinary_secret_key
+### Recover local administrator access
+
+In a PowerShell terminal, with the local MongoDB service running:
+
+```powershell
+Set-Location 'C:\Users\Tarang\Desktop\wrapchik\wrapchik_upgraded_16\wrapchik\backend'
+npm run admin:recover
 ```
+
+The command is restricted to `NODE_ENV=development` and a local MongoDB URI. It lists existing admin email addresses locally, requires you to enter and confirm the exact target email, then prompts for a new password without displaying it. Passwords must contain at least 12 characters, including a letter and a number. It resets an existing administrator only; it will not promote a student or create a second admin. If the local database has no admin, it asks for the details to create the first one. It does not reset or delete any other database data. Sign in using the email and password you selected; email OTP can use the local development code while enabled.
+
+The checked-in frontend `.env.example` is a template only. Set `EXPO_PUBLIC_API_URL` for the target device/network as described above.
 
 ---
 
 ## 🧪 Quick Demo Credentials
-- Demo accounts are disabled by default. Enable them only in development with the environment variables described in `README_SECURITY_PAYMENT.md`.
+- Demo accounts are disabled by default. Use demo accounts only with disposable development data; see [SETUP.md](SETUP.md).
 
 ---
 
 ## 👥 Team Members
 Developed for campus food outlet digital transformation learning & deployment.
+
+## Project guides
+
+- [Local setup](SETUP.md)
+- [Deployment preparation](DEPLOYMENT.md)
+- [API reference](docs/WRAPCHIK_API.md)
