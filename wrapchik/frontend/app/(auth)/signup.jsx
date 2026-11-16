@@ -4,11 +4,9 @@ import React, {
 } from 'react';
 
 import {
-  View,
   Text,
   StyleSheet,
   ScrollView,
-  Alert,
 } from 'react-native';
 
 import { useRouter } from 'expo-router';
@@ -49,32 +47,25 @@ export default function SignupScreen() {
   const validate = () => {
     const err = {};
 
-    if (!name.trim()) {
-      err.name =
-        'Name is required';
+    if (!name.trim() || name.trim().length > 80) {
+      err.name = 'Enter a name between 1 and 80 characters';
     }
 
-    if (!email.includes('@')) {
-      err.email =
-        'Enter a valid email';
+    if (!/^[^\s@]+@thapar\.edu$/i.test(email.trim())) {
+      err.email = 'Use your @thapar.edu student email';
     }
 
-    if (
-      phone
-        .replace(/\D/g, '')
-        .length !== 10
-    ) {
-      err.phone =
-        'Enter a valid 10 digit phone number';
+    const phoneDigits = phone.replace(/\D/g, '');
+    if (phoneDigits.length < 8 || phoneDigits.length > 15) {
+      err.phone = 'Enter a valid phone number with country code if needed';
     }
 
     if (
-      !/^(?=.*[A-Za-z])(?=.*\d).{8,}$/.test(
+      !/^(?=.*[A-Za-z])(?=.*\d).{8,128}$/.test(
         password
       )
     ) {
-      err.password =
-        '8+ characters with a letter and number';
+      err.password = 'Use 8–128 characters with at least one letter and one number';
     }
 
     if (
@@ -107,11 +98,19 @@ export default function SignupScreen() {
       );
 
     if (!result.success) {
-      setErrors({ form: result.message || 'Unable to create account' });
+      setErrors((current) => ({ ...current, server: result.message || 'Unable to create account' }));
       return;
     }
 
-    router.replace('/(auth)/login');
+    router.push({
+      pathname: '/(auth)/email-verification',
+      params: {
+        email: email.trim().toLowerCase(),
+        purpose: 'SIGNUP',
+        resendAfterSeconds: result.resendAfterSeconds || 60,
+        expiresInSeconds: result.expiresInSeconds || 600,
+      },
+    });
   };
 
   return (
@@ -146,7 +145,7 @@ export default function SignupScreen() {
         label="Email"
         value={email}
         onChangeText={setEmail}
-        placeholder="you@example.com"
+        placeholder="you@thapar.edu"
         keyboardType="email-address"
         autoCapitalize="none"
         error={errors.email}
@@ -167,6 +166,7 @@ export default function SignupScreen() {
         onChangeText={setPassword}
         placeholder="8+ characters"
         secureTextEntry
+        showPasswordToggle
         error={errors.password}
       />
 
@@ -176,10 +176,9 @@ export default function SignupScreen() {
         onChangeText={setConfirmPassword}
         placeholder="Repeat password"
         secureTextEntry
+        showPasswordToggle
         error={errors.confirmPassword}
       />
-
-      {errors.form ? <Text style={{ color: COLORS.danger }}>{errors.form}</Text> : null}
 
       <Button
         title="Create Account"
@@ -189,6 +188,7 @@ export default function SignupScreen() {
           marginTop: 10,
         }}
       />
+      {errors.server ? <Text accessibilityRole="alert" style={styles.serverError}>{errors.server}</Text> : null}
 
       <Text style={styles.loginText}>
         Already have an account?
@@ -246,5 +246,13 @@ const styles =
       textAlign: 'center',
       marginTop: 25,
       color: COLORS.textSecondary,
+    },
+    serverError: {
+      color: COLORS.danger,
+      backgroundColor: COLORS.dangerLight,
+      borderRadius: 10,
+      padding: 12,
+      marginTop: 12,
+      fontWeight: '700',
     },
   });
