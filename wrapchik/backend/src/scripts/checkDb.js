@@ -3,56 +3,60 @@ const dotenv = require('dotenv');
 
 dotenv.config();
 
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/wrapchik';
+const models = [
+  'User', 'Order', 'Product', 'Category', 'Payment', 'Notification', 'WebhookEvent', 'Coupon',
+  'PickupSlot', 'RestaurantSettings', 'OtpChallenge', 'EmailOtpChallenge', 'Table', 'GroupOrder', 'Issue',
+].map(name => require(`../models/${name}`));
 
-async function checkDatabase() {
-  try {
-    console.log('\n==================================================');
-    console.log('🔍 CONNECTING TO WRAPCHIK MONGODB DATABASE...');
-    console.log('==================================================');
-
-    await mongoose.connect(MONGO_URI);
-    console.log(`✅ Connected to: ${MONGO_URI}\n`);
-
-    const User = require('../models/User');
-    const Order = require('../models/Order');
-    const Product = require('../models/Product');
-    const Category = require('../models/Category');
-
-    const users = await User.find().select('-passwordHash');
-    const orders = await Order.find().populate('userId', 'name email phone');
-    const products = await Product.find();
-    const categories = await Category.find();
-
-    console.log('--------------------------------------------------');
-    console.log(`👤 REGISTERED USERS (${users.length}):`);
-    console.log('--------------------------------------------------');
-    console.dir(users, { depth: null, colors: true });
-
-    console.log('\n--------------------------------------------------');
-    console.log(`📦 LIVE ORDERS IN DATABASE (${orders.length}):`);
-    console.log('--------------------------------------------------');
-    console.dir(orders, { depth: null, colors: true });
-
-    console.log('\n--------------------------------------------------');
-    console.log(`🍕 PRODUCTS IN MENU (${products.length}):`);
-    console.log('--------------------------------------------------');
-    console.dir(products, { depth: null, colors: true });
-
-    console.log('\n--------------------------------------------------');
-    console.log(`🏷️ CATEGORIES (${categories.length}):`);
-    console.log('--------------------------------------------------');
-    console.dir(categories, { depth: null, colors: true });
-
-    console.log('\n==================================================');
-    console.log('✨ DATABASE CHECK COMPLETE!');
-    console.log('==================================================\n');
-
-    process.exit(0);
-  } catch (err) {
-    console.error('❌ Database Check Error:', err.message);
-    process.exit(1);
+const sameIndex = (actual, expectedKeys, expectedOptions) => {
+  if (JSON.stringify(actual.key) !== JSON.stringify(expectedKeys)) return false;
+  for (const option of ['unique', 'sparse', 'expireAfterSeconds', 'partialFilterExpression']) {
+    if (expectedOptions[option] !== undefined && JSON.stringify(actual[option]) !== JSON.stringify(expectedOptions[option])) return false;
+    if (expectedOptions[option] === undefined && actual[option] !== undefined && actual[option] !== false) return false;
   }
-}
+  return true;
+};
+
+const checkDatabase = async () => {
+  try {
+    console.log('[Database Check] Connecting to the configured MongoDB database…');
+    await mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/wrapchik', { serverSelectionTimeoutMS: 5000 });
+    console.log(`[Database Check] Connected to host ${mongoose.connection.host}; database ${mongoose.connection.name}.`);
+
+    const results = await Promise.all(models.map(async Model => {
+      const [documentCount, hasCollection] = await Promise.all([
+        Model.countDocuments(),
+        mongoose.connection.db.listCollections({ name: Model.collection.collectionName }, { nameOnly: true }).hasNext(),
+      ]);
+      const actualIndexes = hasCollection ? await Model.collection.indexes() : [];
+      const expectedIndexes = Model.schema.indexes().map(([keys, options]) => ({
+        keys,
+        name: options.name || Object.entries(keys).map(([key, direction]) => `${key}_${direction}`).join('_'),
+        verified: actualIndexes.some(index => sameIndex(index, keys, options)),
+      }));
+      return {
+        collection: Model.collection.collectionName,
+        documents: documentCount,
+        indexes: actualIndexes.map(index => ({ name: index.name, keys: index.key, unique: Boolean(index.unique), sparse: Boolean(index.sparse), expireAfterSeconds: index.expireAfterSeconds })),
+        expectedIndexes,
+        missingExpectedIndexes: expectedIndexes.filter(index => !index.verified).map(index => index.name),
+      };
+    }));
+
+    console.log(JSON.stringify({ success: true, collections: results }, null, 2));
+    const missing = results.flatMap(result => result.missingExpectedIndexes.map(name => `${result.collection}.${name}`));
+    if (missing.length) {
+      console.error(`[Database Check] Expected indexes are missing: ${missing.join(', ')}`);
+      process.exitCode = 2;
+    } else {
+      console.log('[Database Check] All declared model indexes are present. No records were modified or printed.');
+    }
+  } catch (error) {
+    console.error(`[Database Check] Failed: ${error.message}`);
+    process.exitCode = 1;
+  } finally {
+    await mongoose.disconnect().catch(() => {});
+  }
+};
 
 checkDatabase();
