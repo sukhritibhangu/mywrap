@@ -15,6 +15,15 @@ const emitOrderUpdate = (order) => {
     orderStatus: order.orderStatus,
     orderType: order.orderType,
     paymentStatus: order.paymentStatus,
+    acceptedAt: order.acceptedAt,
+    preparingAt: order.preparingAt,
+    readyAt: order.readyAt,
+    completedAt: order.completedAt,
+    pickedUpAt: order.pickedUpAt,
+    deliveredAt: order.deliveredAt,
+    servedAt: order.servedAt,
+    rejectedAt: order.rejectedAt,
+    cancelledAt: order.cancelledAt,
   });
   io.to('admin').emit('order_updated', {
     orderId: order._id,
@@ -22,6 +31,15 @@ const emitOrderUpdate = (order) => {
     orderStatus: order.orderStatus,
     orderType: order.orderType,
     paymentStatus: order.paymentStatus,
+    acceptedAt: order.acceptedAt,
+    preparingAt: order.preparingAt,
+    readyAt: order.readyAt,
+    completedAt: order.completedAt,
+    pickedUpAt: order.pickedUpAt,
+    deliveredAt: order.deliveredAt,
+    servedAt: order.servedAt,
+    rejectedAt: order.rejectedAt,
+    cancelledAt: order.cancelledAt,
   });
 };
 
@@ -32,9 +50,21 @@ const emitNewOrder = (order) => {
     orderNumber: order.orderNumber,
     orderType: order.orderType,
     totalAmount: order.totalAmount,
-    items: order.items,
-    userId: order.userId,
+    paymentMethod: order.paymentMethod,
+    paymentStatus: order.paymentStatus,
   });
 };
 
-module.exports = { init, getIO, emitOrderUpdate, emitNewOrder };
+const emitNotification = (notification) => {
+  if (!io || !notification) return;
+  io.to(`user_${notification.userId}`).emit('notification_created', {
+    notificationId: notification._id,
+    title: notification.title,
+    message: notification.message,
+    type: notification.type,
+    orderId: notification.orderId,
+    createdAt: notification.createdAt,
+  });
+};
+
+module.exports = { init, getIO, emitOrderUpdate, emitNewOrder, emitNotification };
