@@ -39,6 +39,9 @@ const TableSelector = ({ tables, selectedTableId, onSelectTable, loading }) => {
               onPress={() => isAvailable && onSelectTable(table._id)}
               disabled={!isAvailable}
               activeOpacity={0.8}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: isSelected, disabled: !isAvailable }}
+              accessibilityLabel={`Table ${table.tableNumber}, ${table.capacity} seats, ${table.status.toLowerCase()}`}
             >
               <Text style={[styles.tableNum, isSelected && styles.textSelected, !isAvailable && styles.textDisabled]}>
                 Table {table.tableNumber}

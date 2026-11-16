@@ -5,14 +5,16 @@ import COLORS from '../../constants/colors';
 
 const FulfillmentSelector = ({ selectedMode, onSelectMode, settings }) => {
   const modes = [
-    { id: 'TAKEAWAY', title: 'Takeaway', desc: 'Pick up', icon: ShoppingBag, enabled: settings?.takeawayEnabled ?? true },
-    { id: 'DELIVERY', title: 'Delivery', desc: 'Hostel', icon: Truck, enabled: settings?.deliveryEnabled ?? true },
-    { id: 'DINE_IN', title: 'Dine-in', desc: 'At table', icon: UtensilsCrossed, enabled: settings?.dineInEnabled ?? true },
+    { id: 'TAKEAWAY', title: 'Pickup', desc: 'SAC counter', icon: ShoppingBag, enabled: settings?.takeawayEnabled === true },
+    { id: 'DELIVERY', title: 'Delivery', desc: 'Hostel', icon: Truck, enabled: settings?.deliveryEnabled === true },
+    { id: 'DINE_IN', title: 'Dine in', desc: 'At table', icon: UtensilsCrossed, enabled: settings?.dineInEnabled === true },
   ];
+  const enabledModes = modes.filter((mode) => mode.enabled);
 
   return (
     <View style={styles.container}>
-      {modes.map((mode) => {
+      {enabledModes.length === 0 ? <Text style={styles.emptyText}>The outlet has not enabled a fulfillment option. Please try again later.</Text> : null}
+      {enabledModes.map((mode) => {
         const Icon = mode.icon;
         const selected = selectedMode === mode.id;
         const disabled = !mode.enabled;
@@ -20,6 +22,9 @@ const FulfillmentSelector = ({ selectedMode, onSelectMode, settings }) => {
           <TouchableOpacity
             key={mode.id}
             disabled={disabled}
+            accessibilityRole="radio"
+            accessibilityState={{ selected, disabled }}
+            accessibilityLabel={`${mode.title}: ${disabled ? 'unavailable' : mode.desc}`}
             onPress={() => onSelectMode(mode.id)}
             activeOpacity={0.86}
             style={[styles.card, selected && styles.selected, disabled && styles.disabled]}
@@ -49,6 +54,7 @@ const styles = StyleSheet.create({
   desc: { fontSize: 10, color: COLORS.textSecondary, marginTop: 3 },
   disabledText: { color: '#A5A5A5' },
   check: { position: 'absolute', right: 7, top: 7, width: 19, height: 19, borderRadius: 10, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center' },
+  emptyText: { flex: 1, color: COLORS.textSecondary, fontSize: 13, lineHeight: 19, padding: 16, borderRadius: 16, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: COLORS.border },
 });
 
 export default FulfillmentSelector;

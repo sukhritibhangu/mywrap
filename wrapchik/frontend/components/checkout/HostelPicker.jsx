@@ -21,6 +21,9 @@ const HostelPicker = ({ selectedHostel, onSelectHostel }) => {
               style={[styles.chip, isSelected && styles.chipSelected]}
               onPress={() => onSelectHostel(hostel)}
               activeOpacity={0.8}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: isSelected }}
+              accessibilityLabel={hostel}
             >
               <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>
                 {hostel}
