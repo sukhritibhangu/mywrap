@@ -17,7 +17,7 @@ const Button = ({ title, onPress, variant = 'primary', loading = false, disabled
       accessibilityLabel={accessibilityLabel || title}
       accessibilityState={{ disabled: disabled || loading, busy: loading }}
       testID={testID}
-      activeOpacity={0.8}
+      activeOpacity={0.85}
       style={[
         styles.button,
         isPrimary && styles.btnPrimary,
@@ -29,7 +29,7 @@ const Button = ({ title, onPress, variant = 'primary', loading = false, disabled
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={isOutline ? COLORS.primary : '#FFFFFF'} size="small" />
+        <ActivityIndicator color={isOutline || isSecondary ? COLORS.primary : '#FFFFFF'} size="small" />
       ) : (
         <Text
           style={[
@@ -57,49 +57,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 22,
     flexDirection: 'row',
+    borderWidth: 1.5,
+    borderColor: 'transparent',
   },
   btnPrimary: {
     backgroundColor: COLORS.primary,
-    shadowColor: COLORS.primaryDark,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.16,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  btnSecondary: {
-    backgroundColor: COLORS.primaryLight,
-  },
-  btnOutline: {
-    backgroundColor: 'transparent',
-    borderWidth: 1.5,
     borderColor: COLORS.primary,
+    shadowColor: COLORS.primaryDark,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.22,
+    shadowRadius: 12,
+    elevation: 3,
   },
-  btnDanger: {
-    backgroundColor: COLORS.danger,
-  },
-  btnDisabled: {
-    backgroundColor: '#E9E7E4',
-    borderColor: '#E9E7E4',
-  },
-  text: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  textPrimary: {
-    color: '#FFFFFF',
-  },
-  textSecondary: {
-    color: COLORS.primary,
-  },
-  textOutline: {
-    color: COLORS.primary,
-  },
-  textDanger: {
-    color: '#FFFFFF',
-  },
-  textDisabled: {
-    color: '#9E9E9E',
-  },
+  btnSecondary: { backgroundColor: COLORS.goldLight, borderColor: COLORS.goldLight },
+  btnOutline: { backgroundColor: 'transparent', borderColor: COLORS.primary },
+  btnDanger: { backgroundColor: COLORS.danger, borderColor: COLORS.danger },
+  btnDisabled: { backgroundColor: COLORS.surfaceMuted, borderColor: COLORS.surfaceMuted, shadowOpacity: 0, elevation: 0 },
+  text: { fontSize: 15, fontWeight: '800', letterSpacing: 0.2 },
+  textPrimary: { color: '#FFFFFF' },
+  textSecondary: { color: COLORS.cocoa },
+  textOutline: { color: COLORS.primaryDark },
+  textDanger: { color: '#FFFFFF' },
+  textDisabled: { color: '#A79A8C' },
 });
 
 export default Button;

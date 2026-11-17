@@ -3,22 +3,23 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import COLORS from '../constants/colors';
 import Button from '../components/common/Button';
+import Wrapoo from '../components/wrapoo/Wrapoo';
 
 const SLIDES = [
   {
-    icon: '🌯',
-    title: 'Delicious Food, Order Easily',
-    desc: 'Browse fresh wraps, burgers, fries, and cold coffee right from your phone.',
+    wrapoo: 'cheer',
+    title: 'Meet your little food companion',
+    desc: 'Wrapoo knows the menu, celebrates your cravings and follows every order along the way.',
   },
   {
-    icon: '⚡',
-    title: 'Skip the Counter Queue',
-    desc: 'No more waiting in long lines at the campus shop. Place your order digitally in seconds.',
+    wrapoo: 'happy',
+    title: 'Skip the counter queue',
+    desc: 'Fresh wraps, burgers, fries and cold coffee — ordered in a few happy taps.',
   },
   {
-    icon: '📍',
-    title: 'Live Tracking & Instant Pickup',
-    desc: 'Track your order status in real time and pick up your hot food as soon as it is ready.',
+    wrapoo: 'tracking',
+    title: 'Follow the cooking magic',
+    desc: 'Watch your order travel from “received” to “ready”, then collect it hot at the counter.',
   },
 ];
 
@@ -48,7 +49,7 @@ export default function OnboardingScreen() {
 
       <View style={styles.content}>
         <View style={styles.iconCircle}>
-          <Text style={styles.icon}>{slide.icon}</Text>
+          <Wrapoo size={132} mood={slide.wrapoo} />
         </View>
 
         <Text style={styles.title}>{slide.title}</Text>
@@ -81,7 +82,7 @@ export default function OnboardingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.background,
     padding: 24,
     justifyContent: 'space-between',
   },
@@ -100,16 +101,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   iconCircle: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: COLORS.primaryLight,
-    justifyContent: 'center',
+    minHeight: 170,
+    justifyContent: 'flex-end',
     alignItems: 'center',
-    marginBottom: 32,
-  },
-  icon: {
-    fontSize: 70,
+    marginBottom: 18,
   },
   title: {
     fontSize: 24,

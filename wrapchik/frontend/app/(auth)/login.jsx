@@ -7,6 +7,7 @@ import authService from '../../services/authService';
 import Input from '../../components/common/Input';
 import Button from '../../components/common/Button';
 import COLORS from '../../constants/colors';
+import Wrapoo from '../../components/wrapoo/Wrapoo';
 
 let googleScriptPromise;
 function loadGoogleScript() {
@@ -65,8 +66,9 @@ function GoogleButton({ onCredential, onError }) {
 export default function LoginScreen() {
   const router = useRouter();
   const { returnTo } = useLocalSearchParams();
-  const { login, loginWithGoogle, isLoading } = useContext(AuthContext);
+  const { login, loginDemoAdmin, loginWithGoogle, isLoading } = useContext(AuthContext);
   const [adminMode, setAdminMode] = useState(false);
+  const [demoAvailable, setDemoAvailable] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
@@ -74,6 +76,15 @@ export default function LoginScreen() {
   const [attempt, setAttempt] = useState(0);
   const [error, setError] = useState('');
   const googleBusy = useRef(false);
+
+  useEffect(() => {
+    if (!adminMode) { setDemoAvailable(false); return undefined; }
+    let active = true;
+    authService.demoAdminStatus()
+      .then((result) => { if (active) setDemoAvailable(Boolean(result?.enabled)); })
+      .catch(() => { if (active) setDemoAvailable(false); });
+    return () => { active = false; };
+  }, [adminMode]);
   const goHome = (user) => {
     if (user?.role === 'admin') return router.replace('/admin/dashboard');
     const routes = { checkout: '/checkout', orders: '/(tabs)/orders', favourites: '/favourites', notifications: '/notifications' };
@@ -98,12 +109,18 @@ export default function LoginScreen() {
     if (result.success) goHome(result.user);
     else setError(result.message || 'Invalid email or password.');
   };
+  const handleDemoAdmin = async () => {
+    setError('');
+    const result = await loginDemoAdmin();
+    if (result.success) goHome(result.user);
+    else setError(result.message || 'Demo admin is unavailable. Check the backend setup.');
+  };
   return <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
     <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
       <View style={styles.hero}>
-        <View style={styles.logo}><Text style={styles.logoText}>W</Text></View>
-        <Text style={styles.brand}>WRAPCHIK</Text>
-        <Text style={styles.tagline}>Campus cravings. One tap away. 🌯</Text>
+        <Wrapoo size={86} mood="happy" />
+        <Text style={[styles.brand, styles.brandWithWrapoo]}>WRAPCHIK</Text>
+        <Text style={styles.tagline}>Campus cravings. A little magic. One tap away.</Text>
       </View>
       <View style={styles.card}>
         <Text style={styles.title}>{adminMode ? 'Admin sign in' : pendingGoogle ? 'One last thing' : 'Welcome to Wrapchik'}</Text>
@@ -113,6 +130,13 @@ export default function LoginScreen() {
           <Input label="Password" value={password} onChangeText={setPassword} placeholder="Your password" secureTextEntry showPasswordToggle />
           <TouchableOpacity accessibilityRole="button" onPress={() => router.push('/(auth)/forgot-password')} style={styles.forgot}><Text style={styles.link}>Forgot password?</Text></TouchableOpacity>
           <Button title="Sign In as Admin" onPress={handleAdmin} loading={isLoading} />
+          {demoAvailable ? (
+            <View style={styles.demoBox}>
+              <Text style={styles.demoKicker}>LOCAL DEVELOPMENT DEMO</Text>
+              <Text style={styles.demoNote}>One-click admin access for local reviews. Disabled outside development; never use it for real orders.</Text>
+              <Button title="Enter demo admin" variant="outline" onPress={handleDemoAdmin} disabled={isLoading} />
+            </View>
+          ) : null}
         </> : pendingGoogle ? <>
           <Text style={styles.info}>{pendingGoogle.name} · {pendingGoogle.email}</Text>
           <Input label="Phone number" value={phone} onChangeText={setPhone} placeholder="10-digit mobile number" keyboardType="phone-pad" />
@@ -140,14 +164,13 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFF8F3' },
+  container: { flex: 1, backgroundColor: COLORS.background },
   scroll: { padding: 22, paddingVertical: 36, width: '100%', maxWidth: 560, alignSelf: 'center', flexGrow: 1, justifyContent: 'center' },
   hero: { alignItems: 'center', marginBottom: 24 },
-  logo: { width: 62, height: 62, borderRadius: 20, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '-5deg' }] },
-  logoText: { color: '#FFF', fontSize: 34, fontWeight: '900' },
   brand: { marginTop: 12, color: COLORS.textPrimary, fontSize: 23, fontWeight: '900', letterSpacing: 2 },
+  brandWithWrapoo: { marginTop: 6 },
   tagline: { marginTop: 5, color: COLORS.textSecondary, fontSize: 13 },
-  card: { backgroundColor: '#FFF', borderRadius: 20, padding: 22, borderWidth: 1, borderColor: '#F0E5DE', width: '100%' },
+  card: { backgroundColor: COLORS.cardBackground, borderRadius: 20, padding: 22, borderWidth: 1, borderColor: COLORS.border, width: '100%' },
   title: { fontSize: 25, fontWeight: '900', color: COLORS.textPrimary },
   subtitle: { fontSize: 14, lineHeight: 21, color: COLORS.textSecondary, marginTop: 6, marginBottom: 22 },
   googleButton: { alignItems: 'center', minHeight: 48, justifyContent: 'center', width: '100%' },
@@ -160,5 +183,8 @@ const styles = StyleSheet.create({
   error: { color: COLORS.danger, fontSize: 13, lineHeight: 19 },
   security: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 7, marginTop: 22 },
   securityText: { color: COLORS.textSecondary, fontSize: 11, flexShrink: 1 },
+  demoBox: { marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: COLORS.border },
+  demoKicker: { fontSize: 9, fontWeight: '900', letterSpacing: 1.2, color: COLORS.goldDeep },
+  demoNote: { color: COLORS.textSecondary, fontSize: 11.5, lineHeight: 17, marginTop: 3, marginBottom: 10 },
   footer: { alignItems: 'center', padding: 18, marginTop: 4 },
 });

@@ -42,6 +42,10 @@ EXPO_PUBLIC_API_URL=http://localhost:5000
 
 For a phone on Wi-Fi, use the laptop’s LAN IPv4 address. For Android emulator use `http://10.0.2.2:5000`. These are public build-time values, not secrets. Restart Expo after changing `.env`.
 
+## Demo administrator (development only)
+
+Set `ENABLE_ADMIN_DEMO=true` in `backend/.env` and restart the backend. The seeder creates a verified demo administrator (`admin@wrapchik.com` / `WrapchikDemo123!` by default), and the admin sign-in screen shows an **Enter demo admin** button. The server refuses to start with demo mode enabled outside `NODE_ENV=development`; never enable it on production or shared data.
+
 ## Start locally
 
 1. Start MongoDB only if it is stopped.

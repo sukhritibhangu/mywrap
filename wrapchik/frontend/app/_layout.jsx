@@ -1,9 +1,11 @@
 import React from 'react';
-import { Stack } from 'expo-router';
+import { Stack, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider } from '../context/AuthContext';
 import { SocketProvider } from '../context/SocketContext';
 import { CartProvider } from '../context/CartContext';
+import { CompanionProvider } from '../context/CompanionContext';
+import { FlyToCartProvider } from '../context/FlyToCartContext';
 import { NotificationProvider } from '../context/NotificationContext';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef } from 'react';
@@ -19,6 +21,19 @@ Notifications.setNotificationHandler({
     shouldSetBadge: false,
   }),
 });
+
+function AdminRouteGuard() {
+  const router = useRouter();
+  const segments = useSegments();
+  const { user, isLoading } = React.useContext(AuthContext);
+  useEffect(() => {
+    if (isLoading) return;
+    if (segments[0] === 'admin' && user?.role !== 'admin') {
+      router.replace('/(auth)/login');
+    }
+  }, [isLoading, router, segments, user?.role]);
+  return null;
+}
 
 function PushNotificationBridge() {
   const router = useRouter();
@@ -49,8 +64,11 @@ export default function RootLayout() {
       <SocketProvider>
         <NotificationProvider>
         <CartProvider>
+        <CompanionProvider>
+        <FlyToCartProvider>
           <StatusBar style="dark" />
         <PushNotificationBridge />
+        <AdminRouteGuard />
         <Stack screenOptions={{ headerShown: false, animation: 'fade' }}>
           <Stack.Screen name="index" />
           <Stack.Screen name="splash" />
@@ -78,6 +96,8 @@ export default function RootLayout() {
           <Stack.Screen name="report-issue" />
           <Stack.Screen name="admin/issues" />
         </Stack>
+        </FlyToCartProvider>
+        </CompanionProvider>
         </CartProvider>
         </NotificationProvider>
       </SocketProvider>

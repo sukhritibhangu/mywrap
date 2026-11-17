@@ -1,30 +1,64 @@
-import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, StyleSheet, Animated, Easing, Platform } from 'react-native';
 import COLORS from '../../constants/colors';
+import THEME from '../../constants/theme';
+import useReducedMotion from '../../hooks/useReducedMotion';
 
-function ProductSkeleton() {
+function useShimmer() {
+  const reducedMotion = useReducedMotion();
+  const shimmer = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (reducedMotion) return undefined;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(shimmer, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.quad), useNativeDriver: Platform.OS !== 'web' }),
+        Animated.timing(shimmer, { toValue: 0, duration: 900, easing: Easing.inOut(Easing.quad), useNativeDriver: Platform.OS !== 'web' }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [reducedMotion, shimmer]);
+
+  return shimmer.interpolate({ inputRange: [0, 1], outputRange: [0.45, 0.9] });
+}
+
+function ProductSkeleton({ shimmer }) {
   return (
     <View style={styles.card} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-      <View style={styles.image} />
+      <Animated.View style={[styles.image, { opacity: shimmer }]} />
       <View style={styles.content}>
-        <View style={[styles.line, styles.name]} />
-        <View style={[styles.line, styles.description]} />
-        <View style={styles.footer}><View style={[styles.line, styles.price]} /><View style={styles.add} /></View>
+        <Animated.View style={[styles.line, styles.name, { opacity: shimmer }]} />
+        <Animated.View style={[styles.line, styles.description, { opacity: shimmer }]} />
+        <View style={styles.footer}>
+          <Animated.View style={[styles.line, styles.price, { opacity: shimmer }]} />
+          <Animated.View style={[styles.add, { opacity: shimmer }]} />
+        </View>
       </View>
     </View>
   );
 }
 
 export default function ProductListSkeleton({ count = 3 }) {
-  return <View accessibilityLabel="Loading menu items" accessibilityRole="progressbar">{Array.from({ length: count }, (_, i) => <ProductSkeleton key={i} />)}</View>;
+  const shimmer = useShimmer();
+  return (
+    <View accessibilityLabel="Sprinkling the menu into place" accessibilityRole="progressbar">
+      {Array.from({ length: count }, (_, index) => <ProductSkeleton key={index} shimmer={shimmer} />)}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-  card: { flexDirection: 'row', padding: 12, marginBottom: 12, borderRadius: 18, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: COLORS.border },
-  image: { width: 94, height: 94, borderRadius: 13, backgroundColor: '#EEEAE4' },
+  card: {
+    flexDirection: 'row', padding: 12, marginBottom: 12, borderRadius: THEME.radius.lg,
+    backgroundColor: COLORS.cardBackground, borderWidth: 1, borderColor: COLORS.border,
+  },
+  image: { width: 96, height: 96, borderRadius: THEME.radius.md, backgroundColor: COLORS.surfaceMuted },
   content: { flex: 1, marginLeft: 14, justifyContent: 'space-between', paddingVertical: 3 },
-  line: { backgroundColor: '#EEEAE4', borderRadius: 6 },
-  name: { height: 16, width: '70%' }, description: { height: 28, width: '92%' },
+  line: { backgroundColor: COLORS.surfaceMuted, borderRadius: 7 },
+  name: { height: 16, width: '68%' },
+  description: { height: 26, width: '90%' },
   footer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  price: { height: 16, width: 48 }, add: { height: 32, width: 68, borderRadius: 10, backgroundColor: '#FBE9E7' },
+  price: { height: 16, width: 46 },
+  add: { height: 34, width: 72, borderRadius: THEME.radius.pill, backgroundColor: COLORS.primaryLight },
 });

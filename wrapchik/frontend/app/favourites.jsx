@@ -83,6 +83,7 @@ export default function FavouritesScreen() {
             <View style={styles.itemContainer}>
               <ProductCard
                 product={item}
+                showFavourite={false}
                 onPress={() => router.push(`/product/${item._id}`)}
               />
               <TouchableOpacity

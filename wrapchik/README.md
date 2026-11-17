@@ -202,7 +202,14 @@ The checked-in frontend `.env.example` is a template only. Set `EXPO_PUBLIC_API_
 ---
 
 ## 🧪 Quick Demo Credentials
-- Demo accounts are disabled by default. Use demo accounts only with disposable development data; see [SETUP.md](SETUP.md).
+
+The admin demo is development-only and uses disposable local data.
+
+1. In `backend/.env`, set `ENABLE_ADMIN_DEMO=true` and restart the backend. The seeder creates a verified demo administrator (`admin@wrapchik.com` by default).
+2. Open **Admin sign in** in the app and press **Enter demo admin** — no password is sent from the app.
+3. Prefer typing credentials manually? Use `admin@wrapchik.com` / `WrapchikDemo123!` unless you overrode `DEMO_ADMIN_EMAIL` / `DEMO_ADMIN_PASSWORD`.
+
+The server refuses to start with `ENABLE_ADMIN_DEMO=true` outside `NODE_ENV=development`. Never enable demo accounts on production or staging data.
 
 ---
 

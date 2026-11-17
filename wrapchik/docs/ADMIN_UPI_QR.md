@@ -14,6 +14,6 @@ Removing the preset restores the existing generated order-specific QR. Disabling
 
 ## Administrator credentials
 
-The source defines `admin@wrapchik.com` only as a default demo seed email. A configured `DEMO_ADMIN_EMAIL` can override it, and an existing live account may use another address. There is no checked-in administrator password. A demo password is supplied through `DEMO_ADMIN_PASSWORD` only when deliberately seeding an account; MongoDB stores a bcrypt hash. Test credentials such as `admin@example.com` are mocked unit-test records, not live credentials.
+The source defines `admin@wrapchik.com` only as a default demo seed email. A configured `DEMO_ADMIN_EMAIL` can override it, and an existing live account may use another address. There is no production administrator password checked in. The development-only demo admin (`ENABLE_ADMIN_DEMO=true`, refused outside `NODE_ENV=development`) uses a throwaway documented password and stores only its bcrypt hash in MongoDB. Test credentials such as `admin@example.com` are mocked unit-test records, not live credentials.
 
 The local `npm run admin:recover` script is deliberately limited to a development database on the local machine. It does not reset the Render/Atlas administrator. Recover the live account through its existing password-recovery flow if email delivery is configured, or perform an owner-controlled, targeted reset of that exact admin record. Do not enable demo seeding or create a second administrator to recover access.

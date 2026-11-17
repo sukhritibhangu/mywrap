@@ -7,6 +7,7 @@ import Button from '../../components/common/Button';
 import LoadingIndicator from '../../components/common/LoadingIndicator';
 import api from '../../services/api';
 import COLORS from '../../constants/colors';
+import THEME from '../../constants/theme';
 
 const ToggleSwitch = ({ value, onValueChange, label }) => (
   <View style={styles.toggleRow}>
@@ -117,9 +118,17 @@ export default function AdminSettingsScreen() {
       <Header title="Restaurant Settings" showBack showCart={false} />
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {!!feedback && <View style={[styles.feedback, feedbackError && styles.feedbackError]}><Text style={[styles.feedbackText, feedbackError && styles.feedbackErrorText]}>{feedback}</Text></View>}
-        
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Customer Payments</Text>
+
+        <View style={styles.adminNotice}>
+          <Text style={styles.adminNoticeTitle}>Administrator-only payment settings</Text>
+          <Text style={styles.adminNoticeText}>Only an administrator can upload or replace the customer payment QR and change UPI details. Students never see these controls.</Text>
+        </View>
+
+        <View style={[styles.section, styles.paymentSection]}>
+          <View style={styles.sectionHeadRow}>
+            <Text style={styles.sectionTitle}>Customer payments</Text>
+            <View style={styles.adminTag}><Text style={styles.adminTagText}>ADMIN</Text></View>
+          </View>
           <ToggleSwitch label="Cash at counter enabled" value={settings.cashEnabled !== false} onValueChange={val => setSettings({ ...settings, cashEnabled: val })} />
           <ToggleSwitch label="UPI payment enabled" value={settings.upiEnabled === true} onValueChange={val => setSettings({ ...settings, upiEnabled: val })} />
           <Text style={styles.inputLabel}>Outlet UPI ID</Text>
@@ -127,6 +136,7 @@ export default function AdminSettingsScreen() {
           <Text style={styles.inputLabel}>Payee name</Text>
           <TextInput style={styles.input} value={settings.upiPayeeName || ''} onChangeText={val => setSettings({ ...settings, upiPayeeName: val })} placeholder="Wrapchik TIET" />
           <Text style={styles.inputLabel}>Outlet UPI QR image</Text>
+          <Text style={styles.inputHint}>Shown to students the moment they choose Pay via UPI.</Text>
           {Platform.OS === 'web' ? <>
             {createElement('input', { ref: qrFileInput, type: 'file', accept: 'image/png,image/jpeg,image/webp', onChange: uploadQr, style: { display: 'none' }, 'aria-label': 'Choose outlet UPI QR image' })}
             <Button title={readingQr ? 'Reading image…' : 'Upload or replace QR image'} onPress={() => qrFileInput.current?.click()} disabled={saving || readingQr} variant="outline" />
@@ -142,7 +152,7 @@ export default function AdminSettingsScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Order Toggles</Text>
+          <Text style={styles.sectionTitle}>Order toggles</Text>
           <ToggleSwitch 
             label="Accepting Orders" 
             value={settings.acceptingOrders} 
@@ -173,7 +183,7 @@ export default function AdminSettingsScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>General Info</Text>
+          <Text style={styles.sectionTitle}>General info</Text>
           <Text style={styles.inputLabel}>Open Time</Text>
           <TextInput
             style={styles.input}
@@ -208,7 +218,7 @@ export default function AdminSettingsScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Busy Status</Text>
+          <Text style={styles.sectionTitle}>Busy status</Text>
           <View style={styles.statusRow}>
             {['NORMAL', 'BUSY', 'VERY_BUSY'].map(status => (
               <TouchableOpacity
@@ -238,36 +248,48 @@ export default function AdminSettingsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  scrollContent: { padding: 16, paddingBottom: 40 },
+  scrollContent: { padding: 16, paddingBottom: 40, maxWidth: 760, width: '100%', alignSelf: 'center' },
+  adminNotice: {
+    backgroundColor: COLORS.goldLight, borderRadius: THEME.radius.md, padding: 13,
+    borderWidth: 1, borderColor: 'rgba(217,164,65,0.5)', marginBottom: 16,
+  },
+  adminNoticeTitle: { fontSize: 12.5, fontWeight: '900', color: COLORS.cocoa },
+  adminNoticeText: { fontSize: 11.5, lineHeight: 17, color: COLORS.textSecondary, marginTop: 3 },
   section: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.cardBackground,
     padding: 16,
-    borderRadius: 16,
+    borderRadius: THEME.radius.lg,
     borderWidth: 1,
     borderColor: COLORS.border,
     marginBottom: 16,
+    ...THEME.shadow.soft,
   },
-  sectionTitle: { fontSize: 16, fontWeight: '800', color: COLORS.textPrimary, marginBottom: 16 },
+  paymentSection: { borderColor: 'rgba(217,164,65,0.65)', borderWidth: 1.5 },
+  sectionHeadRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  adminTag: { backgroundColor: COLORS.cocoa, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3, marginBottom: 16 },
+  adminTagText: { color: '#FBEFCF', fontSize: 8.5, fontWeight: '900', letterSpacing: 1 },
+  sectionTitle: { fontSize: 16, fontWeight: '900', color: COLORS.textPrimary, marginBottom: 16 },
+  inputHint: { fontSize: 10.5, color: COLORS.cocoaMuted, marginTop: -10, marginBottom: 10, lineHeight: 15 },
   paymentHelp: { color: COLORS.textSecondary, fontSize: 12, lineHeight: 18, marginTop: -8 },
   
   // Toggle Styles
   toggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   toggleLabel: { fontSize: 15, color: COLORS.textPrimary, fontWeight: '600' },
-  toggleContainer: { width: 50, height: 28, borderRadius: 14, justifyContent: 'center', paddingHorizontal: 2 },
+  toggleContainer: { width: 50, height: 28, borderRadius: 20, justifyContent: 'center', paddingHorizontal: 2 },
   toggleOn: { backgroundColor: COLORS.success },
   toggleOff: { backgroundColor: COLORS.border },
-  toggleCircle: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#FFF' },
+  toggleCircle: { width: 24, height: 24, borderRadius: 16, backgroundColor: COLORS.cardBackground },
   circleOn: { transform: [{ translateX: 22 }] },
   circleOff: { transform: [{ translateX: 0 }] },
 
   // Input Styles
   inputLabel: { fontSize: 13, color: COLORS.textSecondary, marginBottom: 6, fontWeight: '600' },
-  qrPreview: { alignItems: 'center', backgroundColor: '#FFFFFF', padding: 14, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, gap: 12, marginBottom: 16 },
+  qrPreview: { alignItems: 'center', backgroundColor: COLORS.parchment, padding: 14, borderRadius: THEME.radius.md, borderWidth: 1, borderColor: COLORS.border, gap: 12, marginBottom: 16 },
   input: {
     backgroundColor: COLORS.inputBackground,
     borderWidth: 1,
     borderColor: COLORS.border,
-    borderRadius: 8,
+    borderRadius: 16,
     padding: 12,
     fontSize: 15,
     marginBottom: 16,
@@ -279,7 +301,7 @@ const styles = StyleSheet.create({
   statusBtn: {
     flex: 1,
     paddingVertical: 10,
-    borderRadius: 8,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: COLORS.border,
     alignItems: 'center',
@@ -290,5 +312,5 @@ const styles = StyleSheet.create({
   statusBtnTextActive: { color: '#FFF' },
 
   saveBtn: { marginTop: 10 },
-  feedback: { padding: 11, borderRadius: 8, backgroundColor: '#E6F4E9', marginBottom: 12 }, feedbackError: { backgroundColor: '#FCEBE8' }, feedbackText: { color: '#236C3A', fontSize: 12, fontWeight: '700' }, feedbackErrorText: { color: '#97372B' },
+  feedback: { padding: 11, borderRadius: 16, backgroundColor: COLORS.successLight, marginBottom: 12 }, feedbackError: { backgroundColor: COLORS.dangerLight }, feedbackText: { color: COLORS.success, fontSize: 12, fontWeight: '700' }, feedbackErrorText: { color: COLORS.danger },
 });

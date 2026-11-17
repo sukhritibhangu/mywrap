@@ -1,5 +1,6 @@
 import React, { useEffect, useContext } from 'react';
-import { View, Text, StyleSheet, Image } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import Wrapoo from '../components/wrapoo/Wrapoo';
 import { useRouter } from 'expo-router';
 import { AuthContext } from '../context/AuthContext';
 import COLORS from '../constants/colors';
@@ -21,7 +22,7 @@ export default function SplashScreen() {
       } else {
         router.replace('/(auth)/login');
       }
-    }, 1800);
+    }, 900);
 
     return () => clearTimeout(timer);
   }, [isLoading, isAuthenticated, user]);
@@ -29,12 +30,12 @@ export default function SplashScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.logoCircle}>
-        <Text style={styles.logoIcon}>🌯</Text>
+        <Wrapoo size={94} mood="happy" />
       </View>
 
       <Text style={styles.brandTitle}>WRAPCHIK</Text>
-      <Text style={styles.tagline}>Fresh. Fast. Flavorful.</Text>
-      <Text style={styles.subtext}>Campus Food Ordering Platform</Text>
+      <Text style={styles.tagline}>Fresh. Fast. A little magical.</Text>
+      <Text style={styles.subtext}>Your enchanted campus café</Text>
     </View>
   );
 }
@@ -42,22 +43,16 @@ export default function SplashScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.background,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
   },
   logoCircle: {
-    width: 110,
-    height: 110,
-    borderRadius: 55,
-    backgroundColor: COLORS.primaryLight,
-    justifyContent: 'center',
+    minHeight: 120,
+    justifyContent: 'flex-end',
     alignItems: 'center',
-    marginBottom: 20,
-  },
-  logoIcon: {
-    fontSize: 54,
+    marginBottom: 16,
   },
   brandTitle: {
     fontSize: 36,

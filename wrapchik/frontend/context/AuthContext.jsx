@@ -147,6 +147,22 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const loginDemoAdmin = async () => {
+    setIsLoading(true);
+    try {
+      const res = await authService.demoAdminLogin();
+      if (res.success && res.token) {
+        await saveSession(res.token, res.user);
+        return { success: true, user: res.user };
+      }
+      return { success: false, message: res.message };
+    } catch (error) {
+      return { success: false, message: error.message };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const loginWithGoogle = async (credential, challengeId, phone) => {
     setIsLoading(true);
     try {
@@ -219,6 +235,7 @@ export const AuthProvider = ({ children }) => {
       isAuthenticated: !!token && !!user,
       isAdmin: user?.role === 'admin',
       login,
+      loginDemoAdmin,
       loginWithGoogle,
       register,
       verifyOtp,

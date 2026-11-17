@@ -17,6 +17,7 @@ import HostelPicker from '../components/checkout/HostelPicker';
 import TableSelector from '../components/checkout/TableSelector';
 import COLORS from '../constants/colors';
 import ErrorState from '../components/common/ErrorState';
+import UpiPreview from '../components/checkout/UpiPreview';
 
 
 
@@ -44,6 +45,7 @@ export default function CheckoutScreen() {
   const [deliveryInstructions, setDeliveryInstructions] = useState('');
   const [selectedTableId, setSelectedTableId] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('COUNTER');
+  const [upiEstimateConfirmed, setUpiEstimateConfirmed] = useState(false);
   const [pickupMode, setPickupMode] = useState('IMMEDIATE');
   const [pickupSlots, setPickupSlots] = useState([]);
   const [pickupSlotsLoading, setPickupSlotsLoading] = useState(false);
@@ -180,6 +182,9 @@ export default function CheckoutScreen() {
   const fulfillmentField = orderType === 'TAKEAWAY' ? 'takeawayEnabled' : orderType === 'DELIVERY' ? 'deliveryEnabled' : 'dineInEnabled';
   const fulfillmentEnabled = settings?.[fulfillmentField] === true;
 
+  // Whenever the estimate changes, ask again before the student pays.
+  useEffect(() => { setUpiEstimateConfirmed(false); }, [displayTotal, orderType]);
+
   const handleNext = () => {
     setValidationError('');
     if (step === 1) {
@@ -232,6 +237,10 @@ export default function CheckoutScreen() {
 
   const handlePlaceOrder = async () => {
     if (loading || !idempotencyReady || preparedFingerprintRef.current !== intentFingerprint || !cartItems.length || !settings?.acceptingOrders) return;
+    if (paymentMethod === 'UPI_QR' && !upiEstimateConfirmed) {
+      setSubmissionError('Please confirm that you will check the final amount before paying.');
+      return;
+    }
     if (!user) {
       router.push({ pathname: '/(auth)/login', params: { returnTo: 'checkout' } });
       return;
@@ -309,7 +318,7 @@ export default function CheckoutScreen() {
 
   return (
     <View style={styles.container}>
-      <Header title="Checkout" showBack={false} showCart={false} />
+      <Header title="Nearly there" showBack={false} showCart={false} />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {settings?.acceptingOrders === false ? <View style={styles.closedBanner}><Text style={styles.closedTitle}>The outlet is not accepting orders right now.</Text><Text style={styles.closedText}>You can review checkout details, but placing an order is disabled.</Text></View> : null}
@@ -480,7 +489,7 @@ export default function CheckoutScreen() {
                 <View style={styles.paymentMethods}>
                   {settings?.cashEnabled !== false ? <TouchableOpacity 
                     style={[styles.paymentCard, paymentMethod === 'COUNTER' && styles.paymentCardSelected]}
-                    onPress={() => setPaymentMethod('COUNTER')}
+                    onPress={() => { setPaymentMethod('COUNTER'); setUpiEstimateConfirmed(false); setSubmissionError(''); }}
                     accessibilityRole="radio"
                     accessibilityState={{ selected: paymentMethod === 'COUNTER' }}
                   >
@@ -490,7 +499,7 @@ export default function CheckoutScreen() {
                   
                   {settings?.upiEnabled === true && !!settings?.upiId && !!settings?.upiPayeeName ? <TouchableOpacity
                     style={[styles.paymentCard, paymentMethod === 'UPI_QR' && styles.paymentCardSelected]}
-                    onPress={() => setPaymentMethod('UPI_QR')}
+                    onPress={() => { setPaymentMethod('UPI_QR'); setSubmissionError(''); }}
                     accessibilityRole="radio"
                     accessibilityState={{ selected: paymentMethod === 'UPI_QR' }}
                   >
@@ -500,7 +509,16 @@ export default function CheckoutScreen() {
                 </View>
                 {settings?.cashEnabled === false && settings?.upiEnabled !== true ? <Text style={styles.pricingNote}>The outlet has not enabled a payment method yet. Please try again later.</Text> : null}
                 {paymentMethod === 'COUNTER' && settings?.cashEnabled !== false ? <Text style={styles.pricingNote}>Pay cash at the Wrapchik counter when you collect your order.</Text> : null}
-                {paymentMethod === 'UPI_QR' ? <Text style={styles.pricingNote}>After placing your order, scan the outlet QR and pay the exact total shown. Payment stays pending until the admin verifies receipt.</Text> : null}
+                {paymentMethod === 'UPI_QR' ? <>
+                  <UpiPreview
+                    settings={settings}
+                    amount={displayTotal}
+                    estimate
+                    confirmed={upiEstimateConfirmed}
+                    onConfirm={setUpiEstimateConfirmed}
+                  />
+                  <Text style={styles.pricingNote}>Pay only after the next screen shows the final amount from the outlet. Payment stays pending until the outlet verifies your UPI reference — no click or animation marks an order as paid.</Text>
+                </> : null}
                 {submissionError ? <View style={styles.validationBanner} accessibilityRole="alert"><Text style={styles.validationText}>{submissionError}</Text></View> : null}
               </View>
             )}
@@ -528,7 +546,7 @@ export default function CheckoutScreen() {
             <Button
             title={user ? paymentMethod === 'COUNTER' ? `Place Order (₹${displayTotal})` : `Continue to UPI (₹${displayTotal})` : 'Sign in to place order'}
               onPress={handlePlaceOrder}
-              disabled={!cartItems.length || !settings?.acceptingOrders || !idempotencyReady || (step === 3 && !paymentMethod) || preparedFingerprintRef.current !== intentFingerprint}
+              disabled={!cartItems.length || !settings?.acceptingOrders || !idempotencyReady || (step === 3 && !paymentMethod) || (step === 3 && paymentMethod === 'UPI_QR' && !upiEstimateConfirmed) || preparedFingerprintRef.current !== intentFingerprint}
               loading={loading}
               style={styles.actionBtn}
             />
@@ -606,10 +624,12 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '800',
+    fontSize: 17,
+    fontWeight: '900',
+    letterSpacing: 0.1,
     color: COLORS.textPrimary,
-    marginBottom: 16,
+    marginBottom: 14,
+    marginTop: 4,
   },
   validationBanner: { marginBottom: 14, padding: 12, borderRadius: 12, backgroundColor: COLORS.dangerLight, borderWidth: 1, borderColor: '#F2C8C8' },
   validationText: { color: COLORS.danger, fontSize: 13, lineHeight: 18, fontWeight: '600' },
@@ -623,7 +643,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   input: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.cardBackground,
     borderWidth: 1,
     borderColor: COLORS.border,
     borderRadius: 12,
@@ -632,7 +652,7 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
   },
   fulfillmentCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.cardBackground,
     padding: 16,
     borderRadius: 16,
     borderWidth: 1,
@@ -662,7 +682,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.warningLight,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 8,
+    borderRadius: 12,
     gap: 6,
     alignSelf: 'flex-start',
   },
@@ -672,14 +692,14 @@ const styles = StyleSheet.create({
     color: COLORS.warning,
   },
   summaryCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.cardBackground,
     padding: 16,
-    borderRadius: 16,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: COLORS.border,
     marginBottom: 20,
   },
-  customerCard: { backgroundColor: '#FFFFFF', padding: 15, borderRadius: 16, borderWidth: 1, borderColor: COLORS.border, marginBottom: 18 },
+  customerCard: { backgroundColor: COLORS.cardBackground, padding: 15, borderRadius: 18, borderWidth: 1, borderColor: COLORS.border, marginBottom: 18 },
   customerName: { color: COLORS.textPrimary, fontSize: 14, fontWeight: '800' },
   customerDetail: { color: COLORS.textSecondary, fontSize: 12, marginTop: 4 },
   customerNote: { color: COLORS.textSecondary, fontSize: 11, lineHeight: 16, marginTop: 8 },
@@ -758,7 +778,7 @@ const styles = StyleSheet.create({
   },
   paymentCard: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.cardBackground,
     borderWidth: 2,
     borderColor: COLORS.border,
     borderRadius: 12,
@@ -778,84 +798,28 @@ const styles = StyleSheet.create({
   paymentTextSelected: {
     color: COLORS.primary,
   },
-  onlinePaymentPanel: {
-    marginTop: 14,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: 12,
-    backgroundColor: '#FFFFFF',
-  },
-  onlinePaymentTitle: {
-    marginBottom: 10,
-    color: COLORS.textPrimary,
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  onlinePaymentGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  onlineMethodCard: {
-    width: '48%',
-    minHeight: 56,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 9,
-    padding: 9,
-    borderWidth: 1.5,
-    borderColor: COLORS.border,
-    borderRadius: 10,
-    backgroundColor: '#FFFFFF',
-  },
-  onlineMethodCardSelected: {
-    borderColor: COLORS.primary,
-    backgroundColor: COLORS.primaryLight,
-  },
-  onlineMethodCopy: {
-    flex: 1,
-  },
-  onlineMethodLabel: {
-    color: COLORS.textPrimary,
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  onlineMethodLabelSelected: {
-    color: COLORS.primary,
-  },
-  onlineMethodDescription: {
-    marginTop: 2,
-    color: COLORS.textSecondary,
-    fontSize: 10,
-  },
-  onlinePaymentNote: {
-    marginTop: 10,
-    color: COLORS.textSecondary,
-    fontSize: 10,
-    lineHeight: 15,
-  },
   scheduleBlock: { borderTopWidth: 1, borderTopColor: COLORS.border, marginTop: 14, paddingTop: 12 },
   pickupModeRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
-  pickupModeChip: { paddingVertical: 9, paddingHorizontal: 11, borderWidth: 1, borderColor: COLORS.border, borderRadius: 9, backgroundColor: '#fff' },
+  pickupModeChip: { paddingVertical: 9, paddingHorizontal: 11, borderWidth: 1, borderColor: COLORS.border, borderRadius: 12, backgroundColor: COLORS.cardBackground },
   pickupModeChipActive: { borderColor: COLORS.primary, backgroundColor: COLORS.primaryLight },
   pickupModeText: { color: COLORS.textSecondary, fontSize: 12, fontWeight: '700' },
   pickupModeTextActive: { color: COLORS.primary },
   slotGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  slotChip: { minWidth: 135, padding: 9, borderWidth: 1, borderColor: COLORS.border, borderRadius: 8, backgroundColor: '#fff' },
+  slotChip: { minWidth: 135, padding: 9, borderWidth: 1, borderColor: COLORS.border, borderRadius: 12, backgroundColor: COLORS.cardBackground },
   slotChipSelected: { borderColor: COLORS.primary, backgroundColor: COLORS.primary },
   slotText: { color: COLORS.textPrimary, fontSize: 11, fontWeight: '800' },
   slotTextSelected: { color: '#fff' },
   slotCapacity: { color: COLORS.textSecondary, fontSize: 10, marginTop: 4 },
   slotHint: { color: COLORS.textSecondary, fontSize: 12, marginTop: 6 },
-  couponCard: { backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, padding: 13, marginBottom: 12 },
+  couponCard: {
+    backgroundColor: COLORS.cardBackground, borderRadius: 16, borderWidth: 1, borderColor: COLORS.border, padding: 13, marginBottom: 12 },
   couponTitle: { color: COLORS.textPrimary, fontSize: 14, fontWeight: '800', marginBottom: 8 },
-  couponEntry: { flexDirection: 'row', gap: 8 }, couponInput: { flex: 1, borderWidth: 1, borderColor: COLORS.border, borderRadius: 8, paddingHorizontal: 11, paddingVertical: 9, color: COLORS.textPrimary, fontSize: 13 },
+  couponEntry: { flexDirection: 'row', gap: 8 }, couponInput: { flex: 1, borderWidth: 1, borderColor: COLORS.border, borderRadius: 12, paddingHorizontal: 11, paddingVertical: 9, color: COLORS.textPrimary, fontSize: 13 },
   couponButton: { backgroundColor: COLORS.primary, paddingHorizontal: 16, justifyContent: 'center', borderRadius: 8 }, couponButtonText: { color: '#fff', fontSize: 12, fontWeight: '900' },
   couponAppliedRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }, couponAppliedText: { color: '#2E7C44', fontSize: 11, fontWeight: '700' }, removeCoupon: { color: COLORS.danger, fontSize: 11, fontWeight: '800' }, couponError: { color: COLORS.danger, fontSize: 11, marginTop: 7 }, discountVal: { fontSize: 13, fontWeight: '700', color: '#2E7C44' },
   offerList: { marginTop: 10, borderTopWidth: 1, borderTopColor: COLORS.border, paddingTop: 8 }, offerHeading: { color: COLORS.textSecondary, fontSize: 11, fontWeight: '800', marginBottom: 4 }, offerRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 7, borderTopWidth: 1, borderTopColor: '#F3F1EE' }, offerCode: { color: COLORS.textPrimary, fontSize: 11, fontWeight: '800' }, offerTerms: { color: COLORS.textSecondary, fontSize: 10, marginTop: 3 }, offerSelect: { color: COLORS.primary, fontSize: 11, fontWeight: '900' },
   footer: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.cardBackground,
     padding: 16,
     maxWidth: 720,
     width: '100%',

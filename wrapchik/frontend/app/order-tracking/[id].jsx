@@ -3,6 +3,8 @@ import { View, Text, StyleSheet, ScrollView, RefreshControl, Alert, Platform } f
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Clock3, MapPin, ShoppingBag } from 'lucide-react-native';
 import Header from '../../components/common/Header';
+import EnchantedBackdrop from '../../components/enchanted/EnchantedBackdrop';
+import Wrapoo from '../../components/wrapoo/Wrapoo';
 import OrderStatusTimeline from '../../components/order/OrderStatusTimeline';
 import StatusBadge from '../../components/common/StatusBadge';
 import Button from '../../components/common/Button';
@@ -12,6 +14,19 @@ import orderService from '../../services/orderService';
 import { SocketContext } from '../../context/SocketContext';
 import COLORS from '../../constants/colors';
 import { AuthContext } from '../../context/AuthContext';
+
+const WRAPOO_MOMENTS = {
+  PLACED: { mood: 'happy', text: 'Order received! I tucked it safely into the kitchen queue.' },
+  ACCEPTED: { mood: 'tracking', text: 'The kitchen has it. Little butterflies of excitement.' },
+  PREPARING: { mood: 'tracking', text: 'Cooking magic happening. I can almost smell the griddle from here.' },
+  READY: { mood: 'cheer', text: 'Wohoo! It’s ready — hot, wrapped and waiting just for you.' },
+  PICKED_UP: { mood: 'tracking', text: 'On its way across campus. Hold tight!' },
+  DELIVERED: { mood: 'cheer', text: 'Delivered with a little sparkle. Enjoy every bite!' },
+  SERVED: { mood: 'cheer', text: 'Your food is at the table. Have a lovely meal!' },
+  COMPLETED: { mood: 'cheer', text: 'All yours. Enjoy every single bite, campus legend!' },
+  REJECTED: { mood: 'sleepy', text: 'This one didn’t make it to the griddle. Support can help you sort it out.' },
+  CANCELLED: { mood: 'sleepy', text: 'This order was cancelled. No worries — I’m still here for the next craving.' },
+};
 
 export default function OrderTrackingScreen() {
   const params = useLocalSearchParams();
@@ -90,6 +105,7 @@ export default function OrderTrackingScreen() {
   return (
     <View style={styles.container}>
       <Header title={order ? `Order ${order.orderNumber}` : 'Order tracking'} showBack showCart={false} />
+      <EnchantedBackdrop intensity="quiet" />
       {error || !order ? <ErrorState title="Order details are unavailable" message="Check your connection and try again, or open your order history." onRetry={() => fetchOrderDetails()} /> : (
         <ScrollView contentContainerStyle={styles.scrollContent} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => fetchOrderDetails({ refresh: true })} colors={[COLORS.primary]} />}>
           <View style={styles.heroCard}>
@@ -99,8 +115,16 @@ export default function OrderTrackingScreen() {
             <View style={styles.badgeRow}><StatusBadge status={order.orderStatus} /><StatusBadge status={order.paymentStatus} /></View>
           </View>
 
+          <View style={styles.wrapooCard}>
+            <Wrapoo size={66} mood={WRAPOO_MOMENTS[order.orderStatus]?.mood || 'idle'} />
+            <View style={styles.wrapooCopy}>
+              <Text style={styles.wrapooKicker}>WRAPOO IS FOLLOWING ALONG</Text>
+              <Text style={styles.wrapooText}>{WRAPOO_MOMENTS[order.orderStatus]?.text || 'I’ll keep an eye on your order and cheer at every step.'}</Text>
+            </View>
+          </View>
+
           <View style={styles.card}>
-            <View style={styles.sectionTitleRow}><Clock3 size={17} color={COLORS.primary} /><Text style={styles.sectionTitle}>Order progress</Text></View>
+            <View style={styles.sectionTitleRow}><Clock3 size={17} color={COLORS.primaryDark} /><Text style={styles.sectionTitle}>Your order’s little journey</Text></View>
             <OrderStatusTimeline currentStatus={order.orderStatus} orderType={order.orderType || 'TAKEAWAY'} order={order} />
             {order.estimatedPrepTime && ['PLACED', 'ACCEPTED', 'PREPARING'].includes(order.orderStatus) ? <Text style={styles.estimate}>Outlet estimate: about {order.estimatedPrepTime} minutes</Text> : null}
             {order.paymentStatus !== 'SUCCESS' ? <Text style={styles.paymentNote}>
@@ -146,12 +170,20 @@ export default function OrderTrackingScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   scrollContent: { padding: 16, paddingBottom: 32, maxWidth: 760, width: '100%', alignSelf: 'center' },
-  heroCard: { padding: 20, borderRadius: 22, backgroundColor: COLORS.textPrimary, marginBottom: 14 },
-  eyebrow: { color: '#FFD8C9', fontSize: 10, fontWeight: '900', letterSpacing: 1.2 },
+  heroCard: { padding: 20, borderRadius: 24, backgroundColor: COLORS.cocoa, marginBottom: 14, borderWidth: 1, borderColor: 'rgba(217,164,65,0.45)' },
+  eyebrow: { color: '#F3D9A8', fontSize: 9.5, fontWeight: '900', letterSpacing: 1.3 },
   heroTitle: { color: '#FFFFFF', fontSize: 22, fontWeight: '900', marginTop: 6 },
   date: { color: '#D0D5DB', fontSize: 12, marginTop: 5 },
   badgeRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginTop: 14 },
-  card: { padding: 18, borderRadius: 20, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: COLORS.border, marginBottom: 14 },
+  card: { padding: 18, borderRadius: 22, backgroundColor: COLORS.cardBackground, borderWidth: 1, borderColor: COLORS.border, marginBottom: 14 },
+  wrapooCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, paddingRight: 16,
+    borderRadius: 22, backgroundColor: COLORS.parchment, borderWidth: 1, borderColor: COLORS.border,
+    marginBottom: 14,
+  },
+  wrapooCopy: { flex: 1 },
+  wrapooKicker: { color: COLORS.goldDeep, fontSize: 8.5, fontWeight: '900', letterSpacing: 1.2, marginBottom: 3 },
+  wrapooText: { color: COLORS.cocoa, fontSize: 12.5, lineHeight: 18, fontWeight: '600' },
   sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   sectionTitle: { color: COLORS.textPrimary, fontSize: 15, fontWeight: '900' },
   estimate: { color: COLORS.textSecondary, fontSize: 12, marginTop: 6 },

@@ -8,6 +8,8 @@ const router = express.Router();
 const {
   registerUser,
   loginUser,
+  demoAdminLogin,
+  demoAdminStatus,
   sendOtp,
   verifyOtp,
   sendPasswordResetOtp,
@@ -85,6 +87,8 @@ const legacyStudentAuth = (_req, res, next) => {
 router.get('/google/config', googleConfig);
 router.post('/google/challenge', googleLimiter, googleChallenge);
 router.post('/google', googleLimiter, googleLogin);
+router.get('/admin/demo', demoAdminStatus);
+router.post('/admin/demo', passwordLoginLimiter, demoAdminLogin);
 router.post('/admin/login', passwordLoginLimiter, (req, _res, next) => { req.adminLoginOnly = true; next(); }, loginUser);
 router.post('/register', legacyStudentAuth, otpSendLimiter, otpAccountLimiter, registerUser);
 router.post('/login', passwordLoginLimiter, loginUser);

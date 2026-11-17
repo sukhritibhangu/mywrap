@@ -10,12 +10,19 @@ const http = require('http');
 const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
 const socketManager = require('./config/socketManager');
+const { demoAdminEnabled, demoAdminProfile } = require('./config/demoAdmin');
 
 if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
   throw new Error('JWT_SECRET must be set to a random value of at least 32 characters');
 }
 if (process.env.LOCAL_OTP_ENABLED === 'true' && process.env.NODE_ENV !== 'development') {
   throw new Error('LOCAL_OTP_ENABLED is allowed only when NODE_ENV=development');
+}
+if (process.env.ENABLE_ADMIN_DEMO === 'true' && process.env.NODE_ENV !== 'development') {
+  throw new Error('ENABLE_ADMIN_DEMO is allowed only when NODE_ENV=development');
+}
+if (process.env.SEED_DEMO_ACCOUNTS === 'true' && process.env.NODE_ENV !== 'development') {
+  throw new Error('SEED_DEMO_ACCOUNTS is allowed only when NODE_ENV=development');
 }
 const trustProxyHops = Number(process.env.TRUST_PROXY_HOPS || 0);
 if (!Number.isInteger(trustProxyHops) || trustProxyHops < 0 || trustProxyHops > 5) {
@@ -132,18 +139,7 @@ const seedInitialData = async () => {
     }
 
     if (process.env.SEED_DEMO_ACCOUNTS === 'true') {
-      const demoAdminPassword = process.env.DEMO_ADMIN_PASSWORD;
       const demoStudentPassword = process.env.DEMO_STUDENT_PASSWORD;
-      if (demoAdminPassword && !(await User.findOne({ role: 'admin' }))) {
-        await User.create({
-          name: 'Wrapchik Shopkeeper Admin',
-          email: process.env.DEMO_ADMIN_EMAIL || 'admin@wrapchik.com',
-          phone: process.env.DEMO_ADMIN_PHONE || '+919999999999',
-          passwordHash: await bcrypt.hash(demoAdminPassword, 12),
-          role: 'admin',
-        });
-        console.log('[Seeder] Demo admin created.');
-      }
       if (demoStudentPassword && !(await User.findOne({ email: process.env.DEMO_STUDENT_EMAIL || 'student@wrapchik.com' }))) {
         await User.create({
           name: 'Wrapchik Student',
@@ -151,8 +147,33 @@ const seedInitialData = async () => {
           phone: process.env.DEMO_STUDENT_PHONE || '+919999999998',
           passwordHash: await bcrypt.hash(demoStudentPassword, 12),
           role: 'student',
+          emailVerified: true,
         });
         console.log('[Seeder] Demo student created.');
+      }
+    }
+
+    // Single development-only admin seed path for both the one-click demo
+    // endpoint and legacy DEMO_ADMIN_PASSWORD setups. Never runs outside
+    // development (validated at startup).
+    const seedLegacyDemoAdmin = process.env.SEED_DEMO_ACCOUNTS === 'true' && Boolean(process.env.DEMO_ADMIN_PASSWORD);
+    if (demoAdminEnabled() || seedLegacyDemoAdmin) {
+      const demo = demoAdminProfile();
+      const existingDemoAdmin = await User.findOne({ email: demo.email });
+      if (!existingDemoAdmin) {
+        await User.create({
+          name: demo.name,
+          email: demo.email,
+          phone: demo.phone,
+          passwordHash: await bcrypt.hash(demo.password, 12),
+          role: 'admin',
+          emailVerified: true,
+        });
+        console.log(`[Seeder] Demo admin created for ${demo.email}.`);
+      } else if (existingDemoAdmin.role === 'admin' && !existingDemoAdmin.emailVerified && !existingDemoAdmin.phoneVerified) {
+        existingDemoAdmin.emailVerified = true;
+        await existingDemoAdmin.save();
+        console.log(`[Seeder] Demo admin ${demo.email} marked verified.`);
       }
     }
 

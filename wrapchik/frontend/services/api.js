@@ -49,7 +49,7 @@ const clearStoredAuth = async () => {
   }
 };
 
-const API_BASE_URL = getBaseUrl();
+export const API_BASE_URL = getBaseUrl();
 
 console.log('[Wrapchik API] Target Base URL:', API_BASE_URL);
 

@@ -3,6 +3,8 @@ import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { CheckCircle2, Clock3, MapPin, ShoppingBag, XCircle } from 'lucide-react-native';
 import Header from '../components/common/Header';
+import Confetti from '../components/enchanted/Confetti';
+import Wrapoo from '../components/wrapoo/Wrapoo';
 import Button from '../components/common/Button';
 import StatusBadge from '../components/common/StatusBadge';
 import LoadingIndicator from '../components/common/LoadingIndicator';
@@ -48,6 +50,7 @@ export default function OrderConfirmationScreen() {
   return (
     <View style={styles.container}>
       <Header title={order ? 'Order confirmation' : orderId ? 'Order details' : 'Order status'} showBack={false} showCart={false} />
+      <Confetti active={Boolean(order) && !orderWasDeclined} />
       {error || !order ? <>
         <ErrorState
           title={orderId ? 'We couldn’t load the order' : 'No order to confirm'}
@@ -58,9 +61,12 @@ export default function OrderConfirmationScreen() {
       </> : (
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.card}>
-            <View style={[styles.iconCircle, orderWasDeclined && styles.declinedCircle]}>{orderWasDeclined ? <XCircle size={38} color={COLORS.danger} /> : <CheckCircle2 size={38} color={COLORS.success} />}</View>
+            <View style={styles.heroRow}>
+              <View style={[styles.iconCircle, orderWasDeclined && styles.declinedCircle]}>{orderWasDeclined ? <XCircle size={34} color={COLORS.danger} /> : <CheckCircle2 size={34} color={COLORS.success} />}</View>
+              <Wrapoo size={72} mood={orderWasDeclined ? 'sleepy' : 'cheer'} />
+            </View>
             <Text style={styles.eyebrow}>ORDER #{order.orderNumber}</Text>
-            <Text style={styles.title}>{orderWasDeclined ? 'Order update' : 'Thanks for ordering'}</Text>
+            <Text style={styles.title}>{orderWasDeclined ? 'An update on your order' : 'Wohoo! Order placed'}</Text>
             <Text style={styles.subtitle}>{progressMessage(order.orderStatus)}</Text>
             <View style={styles.statusRow}><Text style={styles.label}>Order status</Text><StatusBadge status={order.orderStatus} /></View>
             <View style={styles.statusRow}><Text style={styles.label}>Payment status</Text><StatusBadge status={order.paymentStatus} /></View>
@@ -89,11 +95,12 @@ export default function OrderConfirmationScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   scrollContent: { padding: 18, paddingBottom: 32, maxWidth: 660, width: '100%', alignSelf: 'center' },
-  card: { padding: 22, borderRadius: 26, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: COLORS.border },
-  iconCircle: { width: 64, height: 64, borderRadius: 22, backgroundColor: COLORS.successLight, alignItems: 'center', justifyContent: 'center', marginBottom: 18 },
+  card: { padding: 22, borderRadius: 28, backgroundColor: COLORS.cardBackground, borderWidth: 1, borderColor: COLORS.border },
+  heroRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 14 },
+  iconCircle: { width: 62, height: 62, borderRadius: 22, backgroundColor: COLORS.successLight, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
   declinedCircle: { backgroundColor: COLORS.dangerLight },
   eyebrow: { color: COLORS.primary, fontSize: 10, fontWeight: '900', letterSpacing: 1.2 },
-  title: { color: COLORS.textPrimary, fontSize: 26, lineHeight: 32, fontWeight: '900', marginTop: 5 },
+  title: { color: COLORS.textPrimary, fontSize: 27, lineHeight: 33, fontWeight: '900', marginTop: 5, letterSpacing: -0.3 },
   subtitle: { color: COLORS.textSecondary, fontSize: 14, lineHeight: 21, marginTop: 6, marginBottom: 18 },
   statusRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 42 },
   label: { color: COLORS.textSecondary, fontSize: 13 },

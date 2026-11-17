@@ -1,33 +1,49 @@
+// Wrapchik — Enchanted Café palette.
+// Signature orange stays at the centre; cream, chocolate and magical gold carry the storybook mood.
 const COLORS = {
-  primary: '#FF5722',       // Wrapchik Warm Orange
-  primaryDark: '#E64A19',   // Deep Orange Button Hover/Active
-  primaryLight: '#FBE9E7',  // Soft Orange Tint
-  secondary: '#FF9800',     // Accent Golden Amber
-  
-  // Status Colors
-  success: '#2E7D32',       // Available / Order Success Green
-  successLight: '#E8F5E9',
-  warning: '#F57C00',       // Order Preparing / Pending Amber
-  warningLight: '#FFF3E0',
-  danger: '#D32F2F',        // Error / Cancelled / Out of Stock Red
-  dangerLight: '#FFEBEE',
-  info: '#0288D1',          // Information Blue
-  infoLight: '#E0F7FA',
+  primary: '#F2601F',       // Wrapchik signature orange
+  primaryDark: '#C8440F',   // pressed / deep orange
+  primaryLight: '#FFE9DA',  // soft peach tint
+
+  secondary: '#DFAE45',     // magical gold
+  gold: '#D9A441',
+  goldDeep: '#A97716',
+  goldLight: '#FBEFCF',
+
+  // Chocolate storybook ink
+  cocoa: '#42281B',
+  cocoaSoft: '#7A5A47',
+  cocoaMuted: '#9C806D',
+
+  // Warm surfaces
+  cream: '#FFF7EC',
+  creamDeep: '#F6E7D2',
+  parchment: '#FFFDF7',
+
+  // Status Colors (warmed to sit inside the café palette)
+  success: '#3D7A4A',
+  successLight: '#E7F3E4',
+  warning: '#B26A12',
+  warningLight: '#FFF1D6',
+  danger: '#B93A2B',
+  dangerLight: '#FCE9E4',
+  info: '#2F6E86',
+  infoLight: '#E4F2F5',
 
   // Neutral Colors
-  background: '#FDFBF7',    // Clean Warm Cream White Background
-  cardBackground: '#FFFFFF',// Card Surface
-  textPrimary: '#1F2937',   // Main Heading Text
-  textSecondary: '#6B7280', // Subtitle Muted Gray Text
-  border: '#E5E7EB',        // Light Divider Border
-  inputBackground: '#F9FAFB',
-  surfaceMuted: '#F4F1EC',
-  textInverse: '#FFFFFF',
-  overlay: 'rgba(31, 41, 55, 0.48)',
+  background: '#FFF7EC',
+  cardBackground: '#FFFDF8',
+  textPrimary: '#3A2318',
+  textSecondary: '#7C6152',
+  border: '#EBDCC6',
+  inputBackground: '#FFF9F0',
+  surfaceMuted: '#F5E8D6',
+  textInverse: '#FFFDF8',
+  overlay: 'rgba(58, 35, 24, 0.52)',
 
   // Food Indicators
-  vegGreen: '#2E7D32',
-  nonVegRed: '#D32F2F',
+  vegGreen: '#3D7A4A',
+  nonVegRed: '#B93A2B',
 };
 
 export default COLORS;

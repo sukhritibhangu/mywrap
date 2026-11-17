@@ -11,34 +11,32 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: COLORS.primary,
-        tabBarInactiveTintColor: COLORS.textSecondary,
+        tabBarActiveTintColor: COLORS.primaryDark,
+        tabBarInactiveTintColor: COLORS.cocoaMuted,
         tabBarStyle: {
-          height: 68,
+          height: 70,
           paddingBottom: 10,
           paddingTop: 8,
-          backgroundColor: '#FFFFFF',
+          backgroundColor: COLORS.parchment,
           borderTopColor: COLORS.border,
           borderTopWidth: 1,
-          elevation: 12,
-          shadowColor: '#1F2937',
-          shadowOffset: { width: 0, height: -3 },
-          shadowOpacity: 0.06,
-          shadowRadius: 10,
+          elevation: 14,
+          shadowColor: '#5A3620',
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.08,
+          shadowRadius: 14,
           maxWidth: 1120,
           width: '100%',
           alignSelf: 'center',
         },
-        tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '700',
-        },
+        tabBarLabelStyle: { fontSize: 11.5, fontWeight: '800', letterSpacing: 0.2 },
+        tabBarItemStyle: { paddingTop: 2 },
       }}
     >
       <Tabs.Screen
         name="home"
         options={{
-          title: 'Home',
+          title: 'Menu',
           tabBarIcon: ({ color, size }) => <Home size={size} color={color} />,
         }}
       />
@@ -56,8 +54,9 @@ export default function TabLayout() {
           tabBarBadge: cartCount > 0 ? cartCount : undefined,
           tabBarBadgeStyle: {
             backgroundColor: COLORS.primary,
+            color: '#FFFFFF',
             fontSize: 10,
-            fontWeight: '800',
+            fontWeight: '900',
           },
           tabBarIcon: ({ color, size }) => <ShoppingBag size={size} color={color} />,
         }}

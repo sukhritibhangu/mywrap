@@ -10,6 +10,7 @@ import LoadingIndicator from '../../components/common/LoadingIndicator';
 import ErrorState from '../../components/common/ErrorState';
 import productService from '../../services/productService';
 import favouriteService from '../../services/favouriteService';
+import { favouriteStore } from '../../services/favouriteStore';
 import COLORS from '../../constants/colors';
 import THEME from '../../constants/theme';
 
@@ -73,6 +74,8 @@ export default function ProductDetailScreen() {
     setFavouriteBusy(true);
     const prev = isFavourite;
     setIsFavourite(!prev); // Optimistic update
+    if (prev) favouriteStore.remove(id);
+    else favouriteStore.add(id);
     try {
       if (prev) {
         const response = await favouriteService.removeFavourite(id);
@@ -83,6 +86,8 @@ export default function ProductDetailScreen() {
       }
     } catch (error) {
       setIsFavourite(prev); // Revert on failure
+      if (prev) favouriteStore.add(id);
+      else favouriteStore.remove(id);
       Alert.alert('Could not update favourite', error?.message || 'Please try again.');
     } finally {
       setFavouriteBusy(false);

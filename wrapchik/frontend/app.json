@@ -16,7 +16,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#FFFFFF"
+        "backgroundColor": "#FFF7EC"
       },
       "package": "com.wrapchik.app"
     },
@@ -31,7 +31,7 @@
         {
           "image": "./assets/splash.png",
           "resizeMode": "contain",
-          "backgroundColor": "#FFF8F3"
+          "backgroundColor": "#FFF7EC"
         }
       ],
       "expo-dev-client",
@@ -44,7 +44,7 @@
       [
         "expo-notifications",
         {
-          "color": "#FF5722",
+          "color": "#F2601F",
           "defaultChannel": "orders"
         }
       ]

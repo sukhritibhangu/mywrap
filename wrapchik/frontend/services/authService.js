@@ -5,6 +5,8 @@ const authService = {
   login: (email, password) => api.post('/auth/login', { email, password }),
   // Render's free API may need a minute to wake after inactivity.
   adminLogin: (email, password) => api.post('/auth/admin/login', { email, password }, { timeout: 90000 }),
+  demoAdminStatus: () => api.get('/auth/admin/demo'),
+  demoAdminLogin: () => api.post('/auth/admin/demo', {}),
   googleConfig: () => api.get('/auth/google/config', { timeout: 90000 }),
   googleChallenge: () => api.post('/auth/google/challenge', {}, { timeout: 90000 }),
   googleLogin: (credential, challengeId, phone) => api.post('/auth/google', { credential, challengeId, phone }, { timeout: 90000 }),

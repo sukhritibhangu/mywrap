@@ -174,26 +174,26 @@ export default function AdminProductsScreen() {
             <View style={styles.productCard}>
               {item.imageUrl ? <Image source={{ uri: item.imageUrl }} style={styles.productImage} /> : null}
               <View style={styles.cardInfo}>
-                <Text style={styles.name}>{item.name}</Text>
-                <Text style={styles.price}>₹{item.price} · {typeof item.categoryId === 'object' ? item.categoryId?.name : 'Menu item'} · {item.isVeg === false ? 'Non-veg' : 'Veg'}</Text>
+                <Text style={styles.name} numberOfLines={2}>{item.name}</Text>
+                <Text style={styles.price}>₹{item.price}</Text>
+                <Text style={styles.meta} numberOfLines={1}>
+                  {typeof item.categoryId === 'object' ? item.categoryId?.name : 'Menu item'} · {item.isVeg === false ? 'Non-veg' : 'Veg'}
+                </Text>
                 <Text style={styles.desc} numberOfLines={1}>
                   {item.description}
                 </Text>
               </View>
 
               <View style={styles.cardActions}>
-                <View style={styles.switchRow}>
-                  <Text style={[styles.switchLabel, item.available && styles.switchLabelActive]}>
-                    {item.available ? 'AVAILABLE' : 'OFF'}
-                  </Text>
-                  <Switch
-                    value={item.available === true}
-                    disabled={busyId === item._id}
-                    onValueChange={() => handleToggleAvailability(item._id, item.available)}
-                    trackColor={{ false: '#767577', true: COLORS.primaryLight }}
-                    thumbColor={item.available ? COLORS.primary : '#f4f3f4'}
-                  />
-                </View>
+                <Switch
+                  value={item.available === true}
+                  disabled={busyId === item._id}
+                  onValueChange={() => handleToggleAvailability(item._id, item.available)}
+                  trackColor={{ false: COLORS.surfaceMuted, true: COLORS.primaryLight }}
+                  thumbColor={item.available ? COLORS.primary : COLORS.cocoaMuted}
+                  style={styles.availabilitySwitch}
+                  accessibilityLabel={`${item.name} availability`}
+                />
 
                 <View style={{flexDirection: 'row', gap: 10, marginTop: 4}}>
                   <TouchableOpacity
@@ -258,10 +258,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   filters: { paddingHorizontal: 16, paddingBottom: 10, gap: 8 },
-  searchInput: { backgroundColor: '#fff', borderWidth: 1, borderColor: COLORS.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: COLORS.textPrimary },
-  chip: { paddingHorizontal: 11, paddingVertical: 7, borderRadius: 20, borderWidth: 1, borderColor: COLORS.border, backgroundColor: '#fff', marginRight: 6 },
+  searchInput: { backgroundColor: COLORS.cardBackground, borderWidth: 1, borderColor: COLORS.border, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10, color: COLORS.textPrimary },
+  chip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.cardBackground, marginRight: 6 },
   chipActive: { borderColor: COLORS.primary, backgroundColor: COLORS.primary }, chipText: { fontSize: 12, color: COLORS.textSecondary, fontWeight: '700' }, chipTextActive: { color: '#fff' },
-  errorBanner: { marginHorizontal: 16, marginBottom: 10, backgroundColor: '#FCEBE8', borderRadius: 8, padding: 11 }, errorText: { color: '#9B3328', fontSize: 12 },
+  errorBanner: { marginHorizontal: 16, marginBottom: 10, backgroundColor: COLORS.dangerLight, borderRadius: 16, padding: 11 }, errorText: { color: COLORS.danger, fontSize: 12 },
   countText: {
     fontSize: 14,
     fontWeight: '700',
@@ -279,14 +279,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.cardBackground,
     padding: 14,
-    borderRadius: 14,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: COLORS.border,
     marginBottom: 10,
+    shadowColor: '#5A3620',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.07,
+    shadowRadius: 10,
+    elevation: 2,
   },
-  productImage: { width: 56, height: 56, borderRadius: 8, marginRight: 11, backgroundColor: '#EEE' },
+  productImage: { width: 56, height: 56, borderRadius: 14, marginRight: 11, backgroundColor: COLORS.surfaceMuted },
   cardInfo: {
     flex: 1,
     marginRight: 10,
@@ -299,8 +304,14 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 14,
     fontWeight: '900',
-    color: COLORS.primary,
-    marginTop: 2,
+    color: COLORS.primaryDark,
+    marginTop: 3,
+  },
+  meta: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: COLORS.cocoaMuted,
+    marginTop: 1,
   },
   desc: {
     fontSize: 12,
@@ -311,33 +322,26 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     gap: 8,
   },
-  switchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  switchLabel: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: COLORS.textSecondary,
-  },
-  switchLabelActive: {
-    color: COLORS.primary,
+  availabilitySwitch: {
+    transform: [{ scale: 0.86 }],
+    marginRight: -4,
   },
   deleteBtn: {
     padding: 4,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: COLORS.overlay,
     justifyContent: 'center',
     padding: 20,
   },
   modalContent: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
+    backgroundColor: COLORS.cardBackground,
+    borderRadius: 24,
     padding: 20,
     maxHeight: '80%',
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   modalTitle: {
     fontSize: 18,
@@ -351,7 +355,7 @@ const styles = StyleSheet.create({
   formLabel: { color: COLORS.textPrimary, fontSize: 13, fontWeight: '700', marginTop: 8, marginBottom: 6 },
   categoryChoices: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 6 },
   formSwitch: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 },
-  addonsInput: { minHeight: 74, borderWidth: 1, borderColor: COLORS.border, borderRadius: 8, padding: 10, color: COLORS.textPrimary, textAlignVertical: 'top' },
+  addonsInput: { minHeight: 74, borderWidth: 1, borderColor: COLORS.border, borderRadius: 16, padding: 10, color: COLORS.textPrimary, textAlignVertical: 'top' },
   modalActions: {
     flexDirection: 'row',
     gap: 10,

@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const { demoAdminEnabled, demoAdminProfile } = require('../config/demoAdmin');
 const { createEmailOtpService, normalizeEmail, isValidEmail, isThaparEmail } = require('../services/emailOtpService');
 
 const OTP_TTL_SECONDS = 10 * 60;
@@ -149,6 +150,37 @@ const loginUser = async (req, res, next) => {
       return res.status(403).json({ success: false, message: 'Students must continue with their Thapar Google account.' });
     }
 
+    return res.json({ success: true, token: generateToken(user._id), user: authUserPayload(user) });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Development-only one-click administrator demo. This never exposes a password
+// to the client and is unavailable outside NODE_ENV=development.
+const demoAdminStatus = (req, res) => {
+  res.json({ success: true, enabled: demoAdminEnabled() });
+};
+
+const demoAdminLogin = async (req, res, next) => {
+  if (!demoAdminEnabled()) {
+    return res.status(404).json({ success: false, message: 'Demo admin sign-in is not enabled on this server.' });
+  }
+  try {
+    const { email } = demoAdminProfile();
+    const user = await User.findOne({ email });
+    if (!user || user.role !== 'admin') {
+      return res.status(404).json({
+        success: false,
+        message: `Demo admin ${email} is not seeded. Restart the backend with ENABLE_ADMIN_DEMO=true in development.`,
+      });
+    }
+    if (!isAccountVerified(user)) {
+      return res.status(409).json({
+        success: false,
+        message: 'Demo admin exists but is not verified. Restart the backend so the demo seeder can repair it.',
+      });
+    }
     return res.json({ success: true, token: generateToken(user._id), user: authUserPayload(user) });
   } catch (error) {
     next(error);
@@ -343,6 +375,8 @@ const updateProfile = async (req, res, next) => {
 module.exports = {
   registerUser,
   loginUser,
+  demoAdminLogin,
+  demoAdminStatus,
   sendOtp,
   verifyOtp,
   sendPasswordResetOtp,

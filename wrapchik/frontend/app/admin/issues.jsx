@@ -103,16 +103,16 @@ export default function AdminIssuesScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   list: { padding: 16 },
-  issueCard: { backgroundColor: '#fff', padding: 16, borderRadius: 8, marginBottom: 12, borderWidth: 1, borderColor: COLORS.border },
+  issueCard: { backgroundColor: COLORS.cardBackground, padding: 16, borderRadius: 18, marginBottom: 12, borderWidth: 1, borderColor: COLORS.border, shadowColor: '#5A3620', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.07, shadowRadius: 10, elevation: 2 },
   header: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 8 },
   orderNo: { fontWeight: 'bold', fontSize: 16, flex: 1 },
-  badge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, backgroundColor: '#eee' },
+  badge: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999, backgroundColor: COLORS.surfaceMuted },
   badgeText: { fontSize: 10, fontWeight: 'bold' },
-  openBadge: { backgroundColor: '#FFF3E0' },
-  openText: { color: '#E65100' },
-  resolvedBadge: { backgroundColor: '#E8F5E9' },
-  resolvedText: { color: '#2E7D32' },
+  openBadge: { backgroundColor: COLORS.warningLight },
+  openText: { color: COLORS.warning },
+  resolvedBadge: { backgroundColor: COLORS.successLight },
+  resolvedText: { color: COLORS.success },
   desc: { color: COLORS.textSecondary, marginBottom: 12 },
-  resolveBtn: { backgroundColor: COLORS.primary, padding: 10, borderRadius: 6, alignItems: 'center' },
+  resolveBtn: { backgroundColor: COLORS.primary, paddingVertical: 11, borderRadius: 999, alignItems: 'center' },
   resolveBtnText: { color: '#fff', fontWeight: 'bold' }
 });
