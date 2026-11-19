@@ -78,11 +78,11 @@ const ProductCard = ({ product, onPress, showFavourite = true }) => {
   const launchFlight = (event) => {
     const message = CELEBRATIONS[Math.floor(Math.random() * CELEBRATIONS.length)];
     if (reducedMotion) {
-      celebrate(message, { mood: 'cheer' });
+      celebrate(message, { mood: 'celebrating' });
       return;
     }
     const native = event?.nativeEvent;
-    const fallback = { x: native?.pageX ?? width / 2 - 22, y: native?.pageY ?? 240, w: 0, h: 0 };
+    const fallback = { x: native?.pageX ?? width / 2 - 22, y: (native?.pageY ?? 240) - 8, w: 0, h: 0 };
     let launched = false;
     const launch = (rect) => {
       if (launched) return;
@@ -90,12 +90,13 @@ const ProductCard = ({ product, onPress, showFavourite = true }) => {
       flyToCart({ imageUrl: product.imageUrl, start: rect || fallback });
     };
     if (imageRef.current?.measureInWindow) {
-      imageRef.current.measureInWindow((x, y, w, h) => launch({ x, y, w, h }));
+      // A small lift off the card before the chip starts flying.
+      imageRef.current.measureInWindow((x, y, w, h) => launch({ x, y: y - 6, w, h }));
       setTimeout(() => launch(fallback), 80);
     } else {
       launch(fallback);
     }
-    setTimeout(() => celebrate(message, { mood: 'cheer' }), 640);
+    setTimeout(() => celebrate(message, { mood: 'celebrating' }), 900);
   };
 
   const handleAdd = (e) => {
@@ -108,7 +109,11 @@ const ProductCard = ({ product, onPress, showFavourite = true }) => {
   const handleIncrement = (e) => {
     e?.stopPropagation?.();
     if (existingItem) {
-      if (quantityInCart < 50) updateQuantity(existingItem.cartKey, quantityInCart + 1);
+      if (quantityInCart < 50) {
+        // Every increase flies too, not only the very first add.
+        updateQuantity(existingItem.cartKey, quantityInCart + 1);
+        launchFlight(e);
+      }
     } else {
       addToCart(product, [], 1);
       launchFlight(e);

@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useRef } from 'react';
+import React, { useCallback, useContext, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ShoppingBag, ArrowLeft, Shield, Bell, Sparkles } from 'lucide-react-native';
@@ -15,9 +15,30 @@ const Header = ({ title, showBack = false, showCart = true, showNotifications = 
   const { cartCount } = useContext(CartContext);
   const { isAdmin } = useContext(AuthContext);
   const { unreadCount } = useContext(NotificationContext);
-  const { landCount } = useFlyToCart();
+  const { landCount, setCartTarget } = useFlyToCart();
   const reducedMotion = useReducedMotion();
   const cartScale = useRef(new Animated.Value(1)).current;
+  const cartRef = useRef(null);
+
+  // Tell the flight overlay where the real bag icon sits, so the chip always
+  // lands on the visible cart on every screen size.
+  const measureCart = useCallback(() => {
+    if (!showCart || !cartRef.current?.measureInWindow) return;
+    cartRef.current.measureInWindow((x, y, w, h) => {
+      if (w && h) setCartTarget({ x, y, w, h });
+    });
+  }, [setCartTarget, showCart]);
+
+  useEffect(() => {
+    const timer = setTimeout(measureCart, 60);
+    return () => clearTimeout(timer);
+  }, [measureCart]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return undefined;
+    window.addEventListener('resize', measureCart);
+    return () => window.removeEventListener('resize', measureCart);
+  }, [measureCart]);
 
   useEffect(() => {
     if (!landCount || reducedMotion) return;
@@ -87,6 +108,9 @@ const Header = ({ title, showBack = false, showCart = true, showNotifications = 
         {showCart ? (
           <Animated.View style={{ transform: [{ scale: cartScale }] }}>
             <TouchableOpacity
+              ref={cartRef}
+              collapsable={false}
+              onLayout={measureCart}
               onPress={() => router.push('/(tabs)/cart')}
               style={styles.iconBtn}
               accessibilityRole="button"
