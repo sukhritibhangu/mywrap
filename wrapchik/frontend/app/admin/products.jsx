@@ -8,6 +8,8 @@ import LoadingIndicator from '../../components/common/LoadingIndicator';
 import productService from '../../services/productService';
 import categoryService from '../../services/categoryService';
 import COLORS from '../../constants/colors';
+import AdminRevealRow from '../../components/admin/AdminReveal';
+import useReducedMotion from '../../hooks/useReducedMotion';
 
 export default function AdminProductsScreen() {
   const [products, setProducts] = useState([]);
@@ -22,6 +24,7 @@ export default function AdminProductsScreen() {
   const [addons, setAddons] = useState('');
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState(null);
+  const reducedMotion = useReducedMotion();
 
   // Form modal state
   const [modalVisible, setModalVisible] = useState(false);
@@ -170,8 +173,9 @@ export default function AdminProductsScreen() {
           data={visibleProducts}
           keyExtractor={(item) => item._id}
           contentContainerStyle={styles.listContent}
-          renderItem={({ item }) => (
-            <View style={styles.productCard}>
+          renderItem={({ item, index }) => (
+            <AdminRevealRow delay={Math.min(index, 6) * 40} reducedMotion={reducedMotion}>
+              <View style={styles.productCard}>
               {item.imageUrl ? <Image source={{ uri: item.imageUrl }} style={styles.productImage} /> : null}
               <View style={styles.cardInfo}>
                 <Text style={styles.name} numberOfLines={2}>{item.name}</Text>
@@ -211,6 +215,7 @@ export default function AdminProductsScreen() {
                 </View>
               </View>
             </View>
+            </AdminRevealRow>
           )}
         />
       )}

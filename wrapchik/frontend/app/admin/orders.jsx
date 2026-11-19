@@ -8,9 +8,12 @@ import EmptyState from '../../components/common/EmptyState';
 import adminService from '../../services/adminService';
 import { SocketContext } from '../../context/SocketContext';
 import COLORS from '../../constants/colors';
+import AdminRevealRow from '../../components/admin/AdminReveal';
+import useReducedMotion from '../../hooks/useReducedMotion';
 
 export default function AdminOrdersScreen() {
   const { socket } = React.useContext(SocketContext);
+  const reducedMotion = useReducedMotion();
   const [orders, setOrders] = useState([]);
   const [upiClaims, setUpiClaims] = useState([]);
   const [rejectingUpiId, setRejectingUpiId] = useState('');
@@ -188,7 +191,7 @@ export default function AdminOrdersScreen() {
 
       {upiClaims.length > 0 ? <View style={styles.upiQueue}>
         <Text style={styles.upiTitle}>UPI claims awaiting verification · {upiClaims.length}</Text>
-        {upiClaims.map(claim => <View key={claim._id} style={styles.upiClaim}>
+        {upiClaims.map((claim, index) => <AdminRevealRow key={claim._id} delay={Math.min(index, 4) * 30} reducedMotion={reducedMotion} style={styles.upiClaim}>
           <View style={{ flex: 1 }}>
             <Text style={styles.upiOrder}>#{claim.orderId?.orderNumber || 'Order'} · ₹{claim.amount}</Text>
             <Text style={styles.upiMeta}>{claim.orderId?.customerSnapshot?.name || claim.orderId?.userId?.name || 'Customer'} · Ref {claim.upiTransactionReference}</Text>
@@ -202,7 +205,7 @@ export default function AdminOrdersScreen() {
             <TouchableOpacity style={[styles.upiAction, styles.upiApprove]} onPress={() => handleReviewUpi(claim, 'VERIFY')}><Text style={styles.upiApproveText}>Verify received</Text></TouchableOpacity>
             <TouchableOpacity style={[styles.upiAction, styles.upiReject]} onPress={() => handleReviewUpi(claim, 'REJECT')}><Text style={styles.upiRejectText}>Reject</Text></TouchableOpacity>
           </View>
-        </View>)}
+        </AdminRevealRow>)}
       </View> : null}
 
       {/* Filter Tabs */}
@@ -235,8 +238,9 @@ export default function AdminOrdersScreen() {
           }
           onEndReached={() => { if (hasMore && !loading) fetchAdminOrders({ quiet: true, append: true }); }}
           onEndReachedThreshold={0.45}
-          renderItem={({ item }) => (
-            <View style={styles.orderCard}>
+          renderItem={({ item, index }) => (
+            <AdminRevealRow delay={Math.min(index, 6) * 40} reducedMotion={reducedMotion}>
+              <View style={styles.orderCard}>
               <View style={styles.cardHeader}>
                 <View>
                   <Text style={styles.orderNum}>Order #{item.orderNumber}</Text>
@@ -357,6 +361,7 @@ export default function AdminOrdersScreen() {
                 </View>
               </View>
             </View>
+            </AdminRevealRow>
           )}
         />
       )}
