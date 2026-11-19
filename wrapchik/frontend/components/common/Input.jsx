@@ -88,7 +88,7 @@ const styles = StyleSheet.create({
     ...(Platform.OS === 'android' ? { minHeight: THEME.layout.touchTarget, textAlignVertical: 'center' } : {}),
     borderWidth: 0,
     backgroundColor: 'transparent',
-    ...(Platform.OS === 'web' ? { outline: 'none', outlineStyle: 'none', boxShadow: 'none' } : {}),
+    ...(Platform.OS === 'web' ? { outlineStyle: 'none', outlineWidth: 0, outlineColor: 'transparent', boxShadow: 'none' } : {}),
   },
   visibilityButton: {
     minWidth: 40,

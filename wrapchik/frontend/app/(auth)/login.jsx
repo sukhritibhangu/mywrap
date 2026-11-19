@@ -1,13 +1,16 @@
-import React, { createElement, useContext, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, View, Text, StyleSheet, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Linking } from 'react-native';
+import React, { createElement, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Animated, Easing, Platform, View, Text, StyleSheet, TouchableOpacity, ScrollView, KeyboardAvoidingView, Linking } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ShieldCheck } from 'lucide-react-native';
+import { ShieldCheck, Sparkles, Volume2 } from 'lucide-react-native';
 import { AuthContext } from '../../context/AuthContext';
 import authService from '../../services/authService';
 import Input from '../../components/common/Input';
 import Button from '../../components/common/Button';
 import COLORS from '../../constants/colors';
+import THEME from '../../constants/theme';
 import Wrapoo from '../../components/wrapoo/Wrapoo';
+import { useCompanion } from '../../context/CompanionContext';
+import useReducedMotion from '../../hooks/useReducedMotion';
 
 let googleScriptPromise;
 function loadGoogleScript() {
@@ -63,11 +66,35 @@ function GoogleButton({ onCredential, onError }) {
   </View>;
 }
 
+const RAPO_LINES = {
+  signin: {
+    bubble: "Hey there! I'm Rapo! Welcome to Wrapchik! 🍔\nBeen here before? Let's get you signed in!",
+    speech: "Hey there! I'm Rapo! Welcome to Wrapchik! Been here before? Let's get you signed in!",
+    title: 'Welcome back',
+    subtitle: 'Sign in with your Thapar Google account to see your menu, bag and live orders.',
+  },
+  signup: {
+    bubble: "New to Wrapchik? Let's create your account and get something delicious! 🥙",
+    speech: "New to Wrapchik? Let's create your account and get something delicious!",
+    title: 'Create your account',
+    subtitle: 'One tap with your @thapar.edu Google account creates your Wrapchik profile.',
+  },
+  admin: {
+    bubble: 'Admin console ahead. Sign in with your Wrapchik admin email and password.',
+    speech: 'Admin console ahead. Sign in with your Wrapchik admin email and password.',
+    title: 'Admin sign in',
+    subtitle: 'Use your existing admin email and password.',
+  },
+};
+
 export default function LoginScreen() {
   const router = useRouter();
   const { returnTo } = useLocalSearchParams();
   const { login, loginDemoAdmin, loginWithGoogle, isLoading } = useContext(AuthContext);
+  const { speak, speaking } = useCompanion();
+  const reducedMotion = useReducedMotion();
   const [adminMode, setAdminMode] = useState(false);
+  const [mode, setMode] = useState('signin');
   const [demoAvailable, setDemoAvailable] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -76,6 +103,9 @@ export default function LoginScreen() {
   const [attempt, setAttempt] = useState(0);
   const [error, setError] = useState('');
   const googleBusy = useRef(false);
+  const bubbleIn = useRef(new Animated.Value(1)).current;
+
+  const copy = useMemo(() => (adminMode ? RAPO_LINES.admin : RAPO_LINES[mode]), [adminMode, mode]);
 
   useEffect(() => {
     if (!adminMode) { setDemoAvailable(false); return undefined; }
@@ -85,6 +115,17 @@ export default function LoginScreen() {
       .catch(() => { if (active) setDemoAvailable(false); });
     return () => { active = false; };
   }, [adminMode]);
+
+  // A gentle swap of Rapo's line whenever the mode changes.
+  useEffect(() => {
+    if (reducedMotion) { bubbleIn.setValue(1); return; }
+    bubbleIn.setValue(0);
+    Animated.timing(bubbleIn, {
+      toValue: 1, duration: 260, easing: Easing.out(Easing.cubic),
+      useNativeDriver: Platform.OS !== 'web',
+    }).start();
+  }, [bubbleIn, copy, reducedMotion]);
+
   const goHome = (user) => {
     if (user?.role === 'admin') return router.replace('/admin/dashboard');
     const routes = { checkout: '/checkout', orders: '/(tabs)/orders', favourites: '/favourites', notifications: '/notifications' };
@@ -115,16 +156,63 @@ export default function LoginScreen() {
     if (result.success) goHome(result.user);
     else setError(result.message || 'Demo admin is unavailable. Check the backend setup.');
   };
+
+  const hearRapo = useCallback(() => {
+    speak(copy.speech, { mood: 'talking' });
+  }, [copy.speech, speak]);
+
+  const switchMode = (next) => {
+    setError('');
+    setMode(next);
+  };
+
   return <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
     <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
       <View style={styles.hero}>
-        <Wrapoo size={86} mood="happy" />
-        <Text style={[styles.brand, styles.brandWithWrapoo]}>WRAPCHIK</Text>
-        <Text style={styles.tagline}>Campus cravings. A little magic. One tap away.</Text>
+        <Text style={styles.eyebrow}>WELCOME TO WRAPCHIK</Text>
+        <Text style={styles.brand}>WRAPCHIK</Text>
       </View>
+
+      <View style={styles.rapoRow}>
+        <View style={styles.mascotWrap}>
+          <Wrapoo
+            size={92}
+            mood={speaking ? 'talking' : 'happy'}
+            onPress={hearRapo}
+            onPressHat={hearRapo}
+          />
+        </View>
+        <Animated.View style={[styles.bubble, { opacity: bubbleIn, transform: [{ translateX: bubbleIn.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }] }]}>
+          <Text style={styles.bubbleText}>{copy.bubble}</Text>
+          <TouchableOpacity onPress={hearRapo} style={styles.bubbleHear} accessibilityRole="button" accessibilityLabel="Hear Rapo's greeting">
+            <Volume2 size={12} color={COLORS.cocoaSoft} />
+            <Text style={styles.bubbleHearText}>{speaking ? 'Rapo is talking…' : 'Tap me to hear it'}</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      </View>
+
       <View style={styles.card}>
-        <Text style={styles.title}>{adminMode ? 'Admin sign in' : pendingGoogle ? 'One last thing' : 'Welcome to Wrapchik'}</Text>
-        <Text style={styles.subtitle}>{adminMode ? 'Use your existing admin email and password.' : pendingGoogle ? 'Add a phone number so the outlet can reach you about your order.' : 'Sign in or create an account with your Thapar Google account.'}</Text>
+        {!adminMode && !pendingGoogle ? (
+          <View style={styles.modeSwitch} accessibilityRole="tablist">
+            {[{ id: 'signin', label: 'Sign In' }, { id: 'signup', label: 'Create Account' }].map((option) => (
+              <TouchableOpacity
+                key={option.id}
+                onPress={() => switchMode(option.id)}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: mode === option.id }}
+                style={[styles.modeTab, mode === option.id && styles.modeTabActive]}
+              >
+                <Text style={[styles.modeTabText, mode === option.id && styles.modeTabTextActive]}>{option.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        ) : null}
+
+        <Text style={styles.title}>{pendingGoogle ? 'One last thing' : copy.title}</Text>
+        <Text style={styles.subtitle}>
+          {pendingGoogle ? 'Add a phone number so the outlet can reach you about your order.' : copy.subtitle}
+        </Text>
+
         {adminMode ? <>
           <Input label="Admin email" value={email} onChangeText={setEmail} placeholder="Admin email address" keyboardType="email-address" autoCapitalize="none" />
           <Input label="Password" value={password} onChangeText={setPassword} placeholder="Your password" secureTextEntry showPasswordToggle />
@@ -146,16 +234,37 @@ export default function LoginScreen() {
           }} />
           <TouchableOpacity accessibilityRole="button" onPress={restartGoogle} style={styles.retry}><Text style={styles.link}>Use a different Google account</Text></TouchableOpacity>
         </> : <>
-          <GoogleButton key={attempt} onCredential={handleGoogle} onError={setError} />
+          <GoogleButton key={`${attempt}-${mode}`} onCredential={handleGoogle} onError={setError} />
           <Text style={styles.domain}>Only @thapar.edu Google accounts are accepted.</Text>
           {isLoading ? <ActivityIndicator color={COLORS.primary} accessibilityLabel="Signing in" /> : null}
+          {mode === 'signin' ? (
+            <TouchableOpacity
+              accessibilityRole="button"
+              onPress={() => switchMode('signup')}
+              style={styles.createAccount}
+            >
+              <Sparkles size={15} color={COLORS.primaryDark} />
+              <Text style={styles.createAccountText}>New here? Create your account</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              accessibilityRole="button"
+              onPress={() => switchMode('signin')}
+              style={styles.retry}
+            >
+              <Text style={styles.link}>I already have an account</Text>
+            </TouchableOpacity>
+          )}
         </>}
+
         {error ? <View accessibilityRole="alert" style={styles.errorBox}>
           <Text style={styles.error}>{error}</Text>
           {!adminMode ? <TouchableOpacity accessibilityRole="button" onPress={restartGoogle}><Text style={styles.link}>Try Google again</Text></TouchableOpacity> : null}
         </View> : null}
+
         <View style={styles.security}><ShieldCheck size={17} color={COLORS.success} /><Text style={styles.securityText}>Secure sign-in • Your orders stay with your account</Text></View>
       </View>
+
       <TouchableOpacity accessibilityRole="button" style={styles.footer} onPress={() => { setAdminMode((value) => !value); restartGoogle(); setPassword(''); }}>
         <Text style={styles.link}>{adminMode ? 'Back to student sign in' : 'Admin sign in'}</Text>
       </TouchableOpacity>
@@ -165,23 +274,51 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  scroll: { padding: 22, paddingVertical: 36, width: '100%', maxWidth: 560, alignSelf: 'center', flexGrow: 1, justifyContent: 'center' },
-  hero: { alignItems: 'center', marginBottom: 24 },
-  brand: { marginTop: 12, color: COLORS.textPrimary, fontSize: 23, fontWeight: '900', letterSpacing: 2 },
-  brandWithWrapoo: { marginTop: 6 },
-  tagline: { marginTop: 5, color: COLORS.textSecondary, fontSize: 13 },
-  card: { backgroundColor: COLORS.cardBackground, borderRadius: 20, padding: 22, borderWidth: 1, borderColor: COLORS.border, width: '100%' },
-  title: { fontSize: 25, fontWeight: '900', color: COLORS.textPrimary },
-  subtitle: { fontSize: 14, lineHeight: 21, color: COLORS.textSecondary, marginTop: 6, marginBottom: 22 },
+  scroll: { padding: 22, paddingVertical: 30, width: '100%', maxWidth: 560, alignSelf: 'center', flexGrow: 1, justifyContent: 'center' },
+  hero: { alignItems: 'center', marginBottom: 6 },
+  eyebrow: { fontSize: 9, fontWeight: '900', letterSpacing: 2.2, color: COLORS.goldDeep },
+  brand: { marginTop: 6, color: COLORS.primaryDark, fontSize: 27, fontWeight: '900', letterSpacing: 4 },
+  rapoRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 2, marginBottom: 16, marginTop: 4,
+  },
+  mascotWrap: { width: 96, alignItems: 'center', justifyContent: 'flex-end', paddingTop: 10 },
+  bubble: {
+    flex: 1, minWidth: 0,
+    backgroundColor: COLORS.parchment,
+    borderRadius: 18, borderTopLeftRadius: 6,
+    borderWidth: 1, borderColor: COLORS.gold,
+    paddingHorizontal: 13, paddingVertical: 11,
+    ...THEME.shadow.soft,
+  },
+  bubbleText: { fontSize: 12.8, lineHeight: 18.5, color: COLORS.cocoa, fontWeight: '600' },
+  bubbleHear: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 7, minHeight: 24 },
+  bubbleHearText: { fontSize: 10.5, fontWeight: '800', color: COLORS.cocoaSoft },
+  card: { backgroundColor: COLORS.cardBackground, borderRadius: 22, padding: 20, borderWidth: 1, borderColor: COLORS.border, width: '100%', ...THEME.shadow.soft },
+  modeSwitch: {
+    flexDirection: 'row', backgroundColor: COLORS.surfaceMuted, borderRadius: THEME.radius.pill,
+    padding: 4, marginBottom: 16, gap: 4,
+  },
+  modeTab: { flex: 1, minHeight: 40, alignItems: 'center', justifyContent: 'center', borderRadius: THEME.radius.pill },
+  modeTabActive: { backgroundColor: COLORS.cardBackground, ...THEME.shadow.soft },
+  modeTabText: { fontSize: 12.5, fontWeight: '800', color: COLORS.textSecondary },
+  modeTabTextActive: { color: COLORS.primaryDark },
+  title: { fontSize: 23, fontWeight: '900', color: COLORS.textPrimary },
+  subtitle: { fontSize: 13.5, lineHeight: 20, color: COLORS.textSecondary, marginTop: 6, marginBottom: 20 },
   googleButton: { alignItems: 'center', minHeight: 48, justifyContent: 'center', width: '100%' },
-  domain: { textAlign: 'center', fontSize: 12, lineHeight: 18, color: COLORS.textSecondary, marginVertical: 14 },
+  domain: { textAlign: 'center', fontSize: 12, lineHeight: 18, color: COLORS.textSecondary, marginVertical: 12 },
   info: { color: COLORS.textSecondary, fontSize: 14, lineHeight: 21, marginBottom: 16 },
   link: { color: COLORS.primary, fontWeight: '800', fontSize: 13 },
   forgot: { alignSelf: 'flex-end', paddingVertical: 8, marginTop: -6, marginBottom: 10 },
-  retry: { alignItems: 'center', padding: 14 },
-  errorBox: { backgroundColor: COLORS.dangerLight, borderRadius: 10, padding: 12, marginTop: 14, gap: 10 },
+  retry: { alignItems: 'center', padding: 14, minHeight: 44, justifyContent: 'center' },
+  createAccount: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    minHeight: 48, marginTop: 8, borderRadius: THEME.radius.pill,
+    backgroundColor: COLORS.goldLight, borderWidth: 1, borderColor: COLORS.gold,
+  },
+  createAccountText: { fontSize: 13, fontWeight: '900', color: COLORS.cocoa },
+  errorBox: { backgroundColor: COLORS.dangerLight, borderRadius: 12, padding: 12, marginTop: 14, gap: 10 },
   error: { color: COLORS.danger, fontSize: 13, lineHeight: 19 },
-  security: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 7, marginTop: 22 },
+  security: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 7, marginTop: 20 },
   securityText: { color: COLORS.textSecondary, fontSize: 11, flexShrink: 1 },
   demoBox: { marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: COLORS.border },
   demoKicker: { fontSize: 9, fontWeight: '900', letterSpacing: 1.2, color: COLORS.goldDeep },
