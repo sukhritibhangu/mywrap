@@ -12,6 +12,7 @@ import { useEffect, useRef } from 'react';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { AuthContext } from '../context/AuthContext';
+import OrderReadyCelebration from '../components/order/OrderReadyCelebration';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -69,6 +70,7 @@ export default function RootLayout() {
           <StatusBar style="dark" />
         <PushNotificationBridge />
         <AdminRouteGuard />
+        <OrderReadyCelebration />
         <Stack screenOptions={{ headerShown: false, animation: 'fade' }}>
           <Stack.Screen name="index" />
           <Stack.Screen name="splash" />
