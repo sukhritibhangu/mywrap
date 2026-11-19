@@ -42,9 +42,9 @@ EXPO_PUBLIC_API_URL=http://localhost:5000
 
 For a phone on Wi-Fi, use the laptop’s LAN IPv4 address. For Android emulator use `http://10.0.2.2:5000`. These are public build-time values, not secrets. Restart Expo after changing `.env`.
 
-## Demo administrator (development only)
+## Demo administrator (development only, opt-in)
 
-Set `ENABLE_ADMIN_DEMO=true` in `backend/.env` and restart the backend. The seeder creates a verified demo administrator (`admin@wrapchik.com` / `WrapchikDemo123!` by default), and the admin sign-in screen shows an **Enter demo admin** button. The server refuses to start with demo mode enabled outside `NODE_ENV=development`; never enable it on production or shared data.
+The one-click demo administrator is opt-in: `backend/.env.example` ships `ENABLE_ADMIN_DEMO=false`, so copying the template never creates a known-password administrator. To use it, set `ENABLE_ADMIN_DEMO=true` in `backend/.env` and restart the backend. The seeder then creates a verified demo administrator (`admin@wrapchik.com` / `WrapchikDemo123!` unless you uncomment and override `DEMO_ADMIN_EMAIL` / `DEMO_ADMIN_PASSWORD`), and the admin sign-in screen shows an **Enter demo admin** button. The server refuses to start with demo mode enabled outside `NODE_ENV=development`; never enable it on production or shared data.
 
 ## Start locally
 
