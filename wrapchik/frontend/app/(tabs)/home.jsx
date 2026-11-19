@@ -161,10 +161,10 @@ export default function HomeScreen() {
   const featuredProducts = useMemo(() => products.slice(0, 2), [products]);
 
   const wrapooMessage = useMemo(() => {
-    if (cartCount > 0) return `${cartCount} ${cartCount === 1 ? 'delicious thing' : 'delicious things'} in your bag. Want a little something else?`;
+    if (cartCount > 0) return `${cartCount} ${cartCount === 1 ? 'delicious thing' : 'delicious things'} in your bag! Want to add a little something extra?`;
     if (searchQuery) return 'Hunting for a craving? I can help you sniff it out.';
     if (selectedCategory) return 'Lovely choice. Tap any dish to make it exactly yours.';
-    return 'Hi! I’m Wrapoo. Tap my hat if you’re curious, or let’s go find something delicious.';
+    return "Hi, I'm Rapo! Your foodie buddy! Tap my hat whenever you need a little help!";
   }, [cartCount, searchQuery, selectedCategory]);
 
   return (
@@ -196,12 +196,13 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          <Text style={styles.eyebrow}>AN ENCHANTED CAMPUS CAFÉ</Text>
+          <Text style={styles.eyebrow}>FRESHLY MADE ON CAMPUS</Text>
           <Text style={styles.heroTitle}>
-            Hey {greeting},{'\n'}
-            <Text style={styles.heroAccent}>what’s your craving?</Text>
+            Cravings calling?{greeting !== 'there' ? ` Hey ${greeting}!` : ''}
+            {'\n'}
+            <Text style={styles.heroAccent}>We’ve got you! 🍟</Text>
           </Text>
-          <Text style={styles.heroSub}>Fresh wraps and warm little comforts, made right here on campus.</Text>
+          <Text style={styles.heroSub}>Fresh bites, happy vibes, delivered your way.</Text>
           <SearchBar value={searchQuery} onChangeText={setSearchQuery} onClear={() => setSearchQuery('')} style={styles.searchWrap} />
 
           {closed ? (
@@ -220,7 +221,7 @@ export default function HomeScreen() {
           <View style={styles.pickupIcon}><ShoppingBag size={18} color={COLORS.primaryDark} /></View>
           <View style={styles.pickupCopy}>
             <Text style={styles.pickupTitle}>Pickup at the Wrapchik counter</Text>
-            <Text style={styles.pickupSub}>SAC ground floor · delivery and dine-in also available</Text>
+            <Text style={styles.pickupSub}>SAC ground floor · delivery and dine-in available</Text>
           </View>
           <Sparkles size={16} color={COLORS.gold} />
         </View>
@@ -251,7 +252,7 @@ export default function HomeScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeading}>
             <View>
-              <Text style={styles.sectionEyebrow}>FRESHLY ENCHANTED</Text>
+              <Text style={styles.sectionEyebrow}>FRESH OFF THE GRILL</Text>
               <Text style={styles.sectionTitle}>Just off the griddle</Text>
             </View>
           </View>
@@ -346,8 +347,8 @@ export default function HomeScreen() {
             <ProductListSkeleton />
           ) : products.length === 0 ? (
             <EmptyState
-              title={searchQuery ? 'No magic matches this time' : 'The menu is resting'}
-              message={searchQuery ? 'Try another dish name, or wave your filters away.' : 'There are no items in this menu yet. Please check back soon.'}
+              title={searchQuery ? 'Nothing matches that craving yet' : 'The menu is resting'}
+              message={searchQuery ? 'Try another dish name, or clear your filters.' : 'There are no items in this menu yet. Please check back soon.'}
               buttonTitle={searchQuery || selectedCategory || diet !== 'ALL' ? 'Clear filters' : undefined}
               onButtonPress={() => { setSearchQuery(''); setSelectedCategory(null); setDiet('ALL'); }}
             />
@@ -364,7 +365,7 @@ export default function HomeScreen() {
 
         <View style={styles.footerNote}>
           <Sparkles size={13} color={COLORS.gold} />
-          <Text style={styles.footerNoteText}>Made with a little magic for the TIET campus community</Text>
+          <Text style={styles.footerNoteText}>Made with love for the TIET campus community</Text>
         </View>
       </ScrollView>
 

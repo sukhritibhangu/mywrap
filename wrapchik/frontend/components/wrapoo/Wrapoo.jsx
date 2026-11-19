@@ -76,9 +76,23 @@ function Mouth({ mood }) {
   return <Path d="M53 84q7 8 14 0" stroke={COLORS.cocoa} strokeWidth="3" strokeLinecap="round" fill="none" />;
 }
 
+// Friendly aliases so pages can ask for a feeling rather than a mouth shape.
+const MOOD_ALIASES = {
+  talking: 'cheer',
+  celebrating: 'cheer',
+  happy: 'happy',
+  idle: 'idle',
+  thinking: 'tracking',
+  helping: 'happy',
+  sleepy: 'sleepy',
+  tracking: 'tracking',
+  cheer: 'cheer',
+};
+
 const Wrapoo = ({
   size = 104,
   mood = 'idle',
+  onPress,
   onPressHat,
   floating = true,
   style,
@@ -86,8 +100,30 @@ const Wrapoo = ({
   const reducedMotion = useReducedMotion();
   const bob = useRef(new Animated.Value(0)).current;
   const hatBob = useRef(new Animated.Value(0)).current;
+  const jump = useRef(new Animated.Value(0)).current;
   const [blink, setBlink] = useState(false);
   const animate = floating && !reducedMotion;
+  const shape = MOOD_ALIASES[mood] || 'idle';
+
+  // A talking Rapo opens and closes his mouth so the voice has a face.
+  const talking = mood === 'talking' && !reducedMotion;
+  const [talkOpen, setTalkOpen] = useState(false);
+  useEffect(() => {
+    if (!talking) { setTalkOpen(false); return undefined; }
+    const timer = setInterval(() => setTalkOpen((open) => !open), 190);
+    return () => clearInterval(timer);
+  }, [talking]);
+
+  // A small celebratory hop when Rapo is asked to celebrate.
+  useEffect(() => {
+    if (mood !== 'celebrating' || reducedMotion) return undefined;
+    const animation = Animated.sequence([
+      Animated.timing(jump, { toValue: 1, duration: 220, easing: Easing.out(Easing.quad), useNativeDriver: Platform.OS !== 'web' }),
+      Animated.timing(jump, { toValue: 0, duration: 320, easing: Easing.bounce, useNativeDriver: Platform.OS !== 'web' }),
+    ]);
+    animation.start();
+    return () => animation.stop();
+  }, [jump, mood, reducedMotion]);
 
   useEffect(() => {
     if (!animate) return undefined;
@@ -134,7 +170,8 @@ const Wrapoo = ({
     };
   }, [reducedMotion]);
 
-  const translateY = bob.interpolate({ inputRange: [0, 1], outputRange: [0, -5] });
+  const hop = jump.interpolate({ inputRange: [0, 1], outputRange: [0, -12] });
+  const translateY = Animated.add(bob.interpolate({ inputRange: [0, 1], outputRange: [0, -5] }), hop);
   const hatTranslate = hatBob.interpolate({ inputRange: [0, 1], outputRange: [0, -4] });
   const hatRotate = hatBob.interpolate({ inputRange: [0, 1], outputRange: ['-3deg', '3deg'] });
 
@@ -157,7 +194,14 @@ const Wrapoo = ({
         </Pressable>
       </Animated.View>
 
-      <Animated.View style={{ transform: [{ translateY }, { rotate: mood === 'cheer' ? '-2deg' : '0deg' }] }}>
+      <Animated.View style={{ transform: [{ translateY }, { rotate: shape === 'cheer' ? '-2deg' : '0deg' }] }}>
+        <Pressable
+          onPress={onPress}
+          disabled={!onPress}
+          accessibilityRole={onPress ? 'button' : 'image'}
+          accessibilityLabel={onPress ? "Rapo. Tap to hear what he says." : 'Rapo, a smiling little wrap'}
+          hitSlop={4}
+        >
         <Svg width={size} height={size * 1.02} viewBox="0 0 120 122" fill="none" accessibilityLabel="Wrapoo, a smiling little wrap">
           {/* soft shadow */}
           <Ellipse cx="60" cy="116" rx="30" ry="4.5" fill={COLORS.cocoa} opacity="0.1" />
@@ -193,16 +237,17 @@ const Wrapoo = ({
           <Ellipse cx="38" cy="82" rx="5.4" ry="3.4" fill="#F6B39C" opacity="0.85" />
           <Ellipse cx="82" cy="82" rx="5.4" ry="3.4" fill="#F6B39C" opacity="0.85" />
 
-          <Eyes mood={mood} blink={blink} />
-          <Mouth mood={mood} />
+          <Eyes mood={shape} blink={blink} />
+          <Mouth mood={talking && talkOpen ? 'cheer' : shape} />
 
-          {mood === 'cheer' ? (
+          {shape === 'cheer' ? (
             <G>
               <Path d="m20 38 1.6 4.2 4.2 1.6-4.2 1.6L20 49.6l-1.6-4.2-4.2-1.6 4.2-1.6L20 38Z" fill={COLORS.gold} />
               <Path d="m101 46 1.2 3.2 3.2 1.2-3.2 1.2-1.2 3.2-1.2-3.2-3.2-1.2 3.2-1.2 1.2-3.2Z" fill={COLORS.secondary} />
             </G>
           ) : null}
         </Svg>
+        </Pressable>
       </Animated.View>
     </View>
   );
